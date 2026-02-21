@@ -5,7 +5,7 @@ WORKDIR /app
 # System deps for opencv-headless and pdf2image
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        libgl1-mesa-glx libglib2.0-0 poppler-utils && \
+        libgl1 libglib2.0-0 poppler-utils && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python deps
