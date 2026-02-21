@@ -66,7 +66,7 @@ export default class MicCapture {
     });
 
     // 2. Create audio context at the hardware's native rate
-    this._audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    this._audioCtx = new (window.AudioContext)();
     const nativeRate = this._audioCtx.sampleRate;
 
     // 3. Connect mic → ScriptProcessor (mono in, mono out)
