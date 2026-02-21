@@ -7,7 +7,16 @@
  * - Works both client-side and server-side
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+function resolveApiUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+  // Ensure the URL has a protocol so fetch() doesn't treat it as a relative path
+  if (raw && !raw.startsWith("http://") && !raw.startsWith("https://")) {
+    return `https://${raw}`;
+  }
+  return raw;
+}
+
+const API_URL = resolveApiUrl();
 
 export class ApiError extends Error {
   constructor(
