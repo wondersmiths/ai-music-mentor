@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from backend.config import settings  # noqa: E402
 from backend.logging_setup import setup_logging  # noqa: E402
-from backend.routers import analyze, health, score  # noqa: E402
+from backend.routers import analyze, health, practice, score  # noqa: E402
 
 # ── Logging ──────────────────────────────────────────────────
 
@@ -51,6 +51,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(analyze.router)
 app.include_router(score.router)
+app.include_router(practice.router)
 
 # ── Middleware: request logging ──────────────────────────────
 

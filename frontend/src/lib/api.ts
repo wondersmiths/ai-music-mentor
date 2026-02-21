@@ -106,3 +106,95 @@ export async function parseScore(file: File): Promise<ScoreResult> {
 export async function checkHealth(): Promise<{ status: string }> {
   return request("/health", { method: "GET" });
 }
+
+// ── Practice session types ──────────────────────────────────
+
+export interface AlignmentUpdate {
+  current_measure: number;
+  current_beat: number;
+  confidence: number;
+  is_complete: boolean;
+}
+
+export interface IssueDetail {
+  type: string;
+  severity: string;
+  measure: number;
+  detail: string;
+}
+
+export interface DrillDetail {
+  measure: number;
+  priority: string;
+  issue_summary: string;
+  suggested_tempo: number;
+  repetitions: number;
+  tip: string;
+}
+
+export interface FrameResult {
+  alignment: AlignmentUpdate;
+  pitches: PitchEvent[];
+  onsets: OnsetEvent[];
+  elapsed_s: number;
+}
+
+export interface StopResult {
+  erhu_analysis: {
+    issues: IssueDetail[];
+    accuracy: number;
+    rhythm_score: number;
+  };
+  practice_plan: PracticePlan;
+}
+
+export interface PracticePlan {
+  summary: string;
+  accuracy_pct: number;
+  rhythm_pct: number;
+  priority_measures: number[];
+  drills: DrillDetail[];
+  warmup: string;
+  closing: string;
+}
+
+// ── Practice session API methods ────────────────────────────
+
+/** Start a new practice session with a score and tempo. */
+export async function startPractice(
+  score: ScoreResult,
+  bpm: number,
+): Promise<{ session_id: string; total_notes: number; total_measures: number }> {
+  return request("/api/practice/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title: score.title,
+      measures: score.measures,
+      bpm,
+    }),
+  });
+}
+
+/** Send an audio chunk for real-time alignment. */
+export async function sendPracticeFrame(
+  sessionId: string,
+  wavBlob: Blob,
+): Promise<FrameResult> {
+  const form = new FormData();
+  form.append("session_id", sessionId);
+  form.append("file", wavBlob, "frame.wav");
+  return request<FrameResult>("/api/practice/frame", {
+    method: "POST",
+    body: form,
+  }, { timeout: 10000 });
+}
+
+/** Stop a practice session and get analysis + practice plan. */
+export async function stopPractice(sessionId: string): Promise<StopResult> {
+  return request<StopResult>("/api/practice/stop", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId }),
+  }, { timeout: 60000 });
+}
