@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run Erhu onset detector tests
+        run: python -m ai.pitch.verify_erhu_onset
+
+      - name: Run Erhu score aligner tests
+        run: python -m ai.alignment.verify_erhu_follower
+
+      - name: Run Erhu mistake detector tests
+        run: python -m ai.alignment.verify_erhu_analyzer
+
+      - name: Verify backend imports
+        run: python -c "from backend.main import app; print('Backend OK')"
