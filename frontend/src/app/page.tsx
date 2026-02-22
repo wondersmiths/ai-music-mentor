@@ -6,53 +6,213 @@ import { CursorController } from "@/score/CursorController";
 import { parseScore, ApiError, StopResult } from "@/lib/api";
 import { usePractice } from "@/hooks/usePractice";
 
+// 赛马 (Horse Racing) — 黄海怀 / 沈利群
+// Jianpu: 1=F (F major), 2/4 time, ~130 BPM
+// Pitch mapping: 1=F4 2=G4 3=A4 5=C5 6=D5 7=E5
 const DEMO_SCORE: Score = {
-  title: "C Major Scale",
+  title: "赛马 (Horse Racing)",
   measures: [
-    {
-      number: 1,
-      time_signature: "4/4",
-      notes: [
-        { pitch: "C4", duration: "quarter", beat: 1 },
-        { pitch: "D4", duration: "quarter", beat: 2 },
-        { pitch: "E4", duration: "quarter", beat: 3 },
-        { pitch: "F4", duration: "quarter", beat: 4 },
-      ],
-    },
-    {
-      number: 2,
-      time_signature: "4/4",
-      notes: [
-        { pitch: "G4", duration: "quarter", beat: 1 },
-        { pitch: "A4", duration: "quarter", beat: 2 },
-        { pitch: "B4", duration: "quarter", beat: 3 },
-        { pitch: "C5", duration: "quarter", beat: 4 },
-      ],
-    },
+    // ── Opening theme: 6. 35 repeated ──
+    { number: 1, time_signature: "2/4", notes: [
+      { pitch: "D5", duration: "quarter", beat: 1 },
+      { pitch: "A4", duration: "eighth", beat: 2 },
+      { pitch: "C5", duration: "eighth", beat: 2.5 },
+    ]},
+    { number: 2, time_signature: "2/4", notes: [
+      { pitch: "D5", duration: "quarter", beat: 1 },
+      { pitch: "A4", duration: "eighth", beat: 2 },
+      { pitch: "C5", duration: "eighth", beat: 2.5 },
+    ]},
+    { number: 3, time_signature: "2/4", notes: [
+      { pitch: "D5", duration: "quarter", beat: 1 },
+      { pitch: "A4", duration: "eighth", beat: 2 },
+      { pitch: "C5", duration: "eighth", beat: 2.5 },
+    ]},
+    // ── Running sixteenth figures: 0535 ──
+    { number: 4, time_signature: "2/4", notes: [
+      { pitch: "C5", duration: "sixteenth", beat: 1 },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
+      { pitch: "C5", duration: "sixteenth", beat: 1.5 },
+      { pitch: "A4", duration: "sixteenth", beat: 1.75 },
+      { pitch: "C5", duration: "sixteenth", beat: 2 },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
+      { pitch: "C5", duration: "sixteenth", beat: 2.5 },
+      { pitch: "A4", duration: "sixteenth", beat: 2.75 },
+    ]},
+    { number: 5, time_signature: "2/4", notes: [
+      { pitch: "C5", duration: "sixteenth", beat: 1 },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
+      { pitch: "C5", duration: "sixteenth", beat: 1.5 },
+      { pitch: "A4", duration: "sixteenth", beat: 1.75 },
+      { pitch: "C5", duration: "sixteenth", beat: 2 },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
+      { pitch: "C5", duration: "sixteenth", beat: 2.5 },
+      { pitch: "A4", duration: "sixteenth", beat: 2.75 },
+    ]},
+    // ── 6 56 pattern ──
+    { number: 6, time_signature: "2/4", notes: [
+      { pitch: "D5", duration: "eighth", beat: 1 },
+      { pitch: "C5", duration: "eighth", beat: 1.5 },
+      { pitch: "D5", duration: "eighth", beat: 2 },
+      { pitch: "C5", duration: "eighth", beat: 2.5 },
+    ]},
+    { number: 7, time_signature: "2/4", notes: [
+      { pitch: "D5", duration: "eighth", beat: 1 },
+      { pitch: "C5", duration: "eighth", beat: 1.5 },
+      { pitch: "D5", duration: "eighth", beat: 2 },
+      { pitch: "C5", duration: "eighth", beat: 2.5 },
+    ]},
+    // ── Descending run: 6316 ──
+    { number: 8, time_signature: "2/4", notes: [
+      { pitch: "D5", duration: "eighth", beat: 1 },
+      { pitch: "A4", duration: "eighth", beat: 1.5 },
+      { pitch: "F4", duration: "eighth", beat: 2 },
+      { pitch: "D4", duration: "eighth", beat: 2.5 },
+    ]},
+    // ── 3653 ascending ──
+    { number: 9, time_signature: "2/4", notes: [
+      { pitch: "A4", duration: "eighth", beat: 1 },
+      { pitch: "D5", duration: "eighth", beat: 1.5 },
+      { pitch: "C5", duration: "eighth", beat: 2 },
+      { pitch: "A4", duration: "eighth", beat: 2.5 },
+    ]},
+    // ── 2321 pattern (galloping rhythm) ──
+    { number: 10, time_signature: "2/4", notes: [
+      { pitch: "G4", duration: "sixteenth", beat: 1 },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
+      { pitch: "G4", duration: "sixteenth", beat: 1.5 },
+      { pitch: "F4", duration: "sixteenth", beat: 1.75 },
+      { pitch: "G4", duration: "sixteenth", beat: 2 },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
+      { pitch: "G4", duration: "sixteenth", beat: 2.5 },
+      { pitch: "F4", duration: "sixteenth", beat: 2.75 },
+    ]},
+    { number: 11, time_signature: "2/4", notes: [
+      { pitch: "G4", duration: "sixteenth", beat: 1 },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
+      { pitch: "G4", duration: "sixteenth", beat: 1.5 },
+      { pitch: "F4", duration: "sixteenth", beat: 1.75 },
+      { pitch: "G4", duration: "sixteenth", beat: 2 },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
+      { pitch: "G4", duration: "sixteenth", beat: 2.5 },
+      { pitch: "F4", duration: "sixteenth", beat: 2.75 },
+    ]},
+    // ── 6316 again ──
+    { number: 12, time_signature: "2/4", notes: [
+      { pitch: "D5", duration: "eighth", beat: 1 },
+      { pitch: "A4", duration: "eighth", beat: 1.5 },
+      { pitch: "F4", duration: "eighth", beat: 2 },
+      { pitch: "D4", duration: "eighth", beat: 2.5 },
+    ]},
+    // ── 3653 ──
+    { number: 13, time_signature: "2/4", notes: [
+      { pitch: "A4", duration: "eighth", beat: 1 },
+      { pitch: "D5", duration: "eighth", beat: 1.5 },
+      { pitch: "C5", duration: "eighth", beat: 2 },
+      { pitch: "A4", duration: "eighth", beat: 2.5 },
+    ]},
+    // ── More 2321 ──
+    { number: 14, time_signature: "2/4", notes: [
+      { pitch: "G4", duration: "sixteenth", beat: 1 },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
+      { pitch: "G4", duration: "sixteenth", beat: 1.5 },
+      { pitch: "F4", duration: "sixteenth", beat: 1.75 },
+      { pitch: "G4", duration: "sixteenth", beat: 2 },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
+      { pitch: "G4", duration: "sixteenth", beat: 2.5 },
+      { pitch: "F4", duration: "sixteenth", beat: 2.75 },
+    ]},
+    { number: 15, time_signature: "2/4", notes: [
+      { pitch: "G4", duration: "sixteenth", beat: 1 },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
+      { pitch: "G4", duration: "sixteenth", beat: 1.5 },
+      { pitch: "F4", duration: "sixteenth", beat: 1.75 },
+      { pitch: "G4", duration: "sixteenth", beat: 2 },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
+      { pitch: "G4", duration: "sixteenth", beat: 2.5 },
+      { pitch: "F4", duration: "sixteenth", beat: 2.75 },
+    ]},
+    // ── Sustained 2. 61 section ──
+    { number: 16, time_signature: "2/4", notes: [
+      { pitch: "G4", duration: "quarter", beat: 1 },
+      { pitch: "D5", duration: "eighth", beat: 2 },
+      { pitch: "F4", duration: "eighth", beat: 2.5 },
+    ]},
+    { number: 17, time_signature: "2/4", notes: [
+      { pitch: "G4", duration: "quarter", beat: 1 },
+      { pitch: "D5", duration: "eighth", beat: 2 },
+      { pitch: "F4", duration: "eighth", beat: 2.5 },
+    ]},
+    { number: 18, time_signature: "2/4", notes: [
+      { pitch: "G4", duration: "quarter", beat: 1 },
+      { pitch: "D5", duration: "eighth", beat: 2 },
+      { pitch: "F4", duration: "eighth", beat: 2.5 },
+    ]},
+    { number: 19, time_signature: "2/4", notes: [
+      { pitch: "G4", duration: "quarter", beat: 1 },
+      { pitch: "D5", duration: "eighth", beat: 2 },
+      { pitch: "F4", duration: "eighth", beat: 2.5 },
+    ]},
+    // ── Final 2321 run + cadence ──
+    { number: 20, time_signature: "2/4", notes: [
+      { pitch: "G4", duration: "sixteenth", beat: 1 },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
+      { pitch: "G4", duration: "sixteenth", beat: 1.5 },
+      { pitch: "F4", duration: "sixteenth", beat: 1.75 },
+      { pitch: "G4", duration: "sixteenth", beat: 2 },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
+      { pitch: "G4", duration: "sixteenth", beat: 2.5 },
+      { pitch: "F4", duration: "sixteenth", beat: 2.75 },
+    ]},
+    // ── Cadential measures ──
+    { number: 21, time_signature: "2/4", notes: [
+      { pitch: "D5", duration: "quarter", beat: 1 },
+      { pitch: "C5", duration: "quarter", beat: 2 },
+    ]},
+    { number: 22, time_signature: "2/4", notes: [
+      { pitch: "A4", duration: "quarter", beat: 1 },
+      { pitch: "C5", duration: "quarter", beat: 2 },
+    ]},
+    { number: 23, time_signature: "2/4", notes: [
+      { pitch: "D5", duration: "quarter", beat: 1 },
+      { pitch: "A4", duration: "eighth", beat: 2 },
+      { pitch: "C5", duration: "eighth", beat: 2.5 },
+    ]},
+    { number: 24, time_signature: "2/4", notes: [
+      { pitch: "D5", duration: "half", beat: 1 },
+    ]},
   ],
 };
 
 export default function Home() {
   const [score, setScore] = useState<Score>(DEMO_SCORE);
+  const [isMock, setIsMock] = useState(true);
   const [activeMeasure, setActiveMeasure] = useState(0);
   const [activeBeat, setActiveBeat] = useState(0);
   const [opacity, setOpacity] = useState(1);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [uploadSuccess, setUploadSuccess] = useState("");
   const cursorRef = useRef<CursorController | null>(null);
+
+  // Parse beats-per-measure from time signature (e.g. "2/4" → 2)
+  const beatsPerMeasure =
+    score.measures[0]?.time_signature
+      ? parseInt(score.measures[0].time_signature.split("/")[0], 10) || 4
+      : 4;
 
   useEffect(() => {
     const ctrl = new CursorController();
     ctrl.setRenderCallback((pos) => {
       const measure = Math.floor(pos.position) + 1;
-      const beat = (pos.position % 1) * 4 + 1;
+      const beat = (pos.position % 1) * beatsPerMeasure + 1;
       setActiveMeasure(measure);
       setActiveBeat(beat);
       setOpacity(pos.opacity);
     });
     cursorRef.current = ctrl;
     return () => ctrl.stop();
-  }, []);
+  }, [beatsPerMeasure]);
 
   // Practice hook — needs the score in ScoreResult shape
   const scoreForApi = {
@@ -70,15 +230,27 @@ export default function Home() {
 
       setUploading(true);
       setUploadError("");
+      setUploadSuccess("");
 
       try {
         const data = await parseScore(file);
         setScore({ title: data.title, measures: data.measures });
+        setIsMock(data.is_mock);
+        if (data.is_mock) {
+          setUploadSuccess(
+            `Score recognition confidence too low — showing demo score "${data.title}" (${data.measures.length} measures). ` +
+            `Jianpu / numbered notation is not yet supported by the OMR engine.`
+          );
+        } else {
+          setUploadSuccess(
+            `Loaded "${data.title}" — ${data.measures.length} measures (confidence: ${Math.round(data.confidence * 100)}%)`
+          );
+        }
       } catch (err) {
         if (err instanceof ApiError) {
-          setUploadError(err.detail);
+          setUploadError(`Upload failed: ${err.detail}`);
         } else {
-          setUploadError("Upload failed — check your connection");
+          setUploadError(`Upload failed: ${(err as Error).message || "check your connection"}`);
         }
       } finally {
         setUploading(false);
@@ -150,6 +322,7 @@ export default function Home() {
       )}
 
       {combinedError && <div style={styles.error}>{combinedError}</div>}
+      {uploadSuccess && <div style={styles.success}>{uploadSuccess}</div>}
 
       <ScoreViewer
         score={score}
@@ -379,6 +552,14 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "8px 12px",
     backgroundColor: "#fef2f2",
     color: "#dc2626",
+    borderRadius: 6,
+    marginBottom: 16,
+    fontSize: 14,
+  },
+  success: {
+    padding: "8px 12px",
+    backgroundColor: "#f0fdf4",
+    color: "#16a34a",
     borderRadius: 6,
     marginBottom: 16,
     fontSize: 14,

@@ -20,8 +20,8 @@ class Config:
     LOG_LEVEL: str = "info"
 
     # ── CORS ─────────────────────────────────────────────────
-    # Comma-separated origins. Never use "*" in production.
-    CORS_ORIGINS: str = "http://localhost:3000"
+    # Comma-separated origins, or "*" to allow all.
+    CORS_ORIGINS: str = "*"
 
     # ── Limits ───────────────────────────────────────────────
     MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024  # 10 MB
