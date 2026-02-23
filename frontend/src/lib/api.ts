@@ -93,8 +93,11 @@ export interface ScoreResult {
   measures: Array<{
     number: number;
     time_signature: string;
-    notes: Array<{ pitch: string; duration: string; beat: number }>;
+    notes: Array<{ pitch: string; duration: string; beat: number; jianpu?: string | null }>;
   }>;
+  notation_type?: string;
+  key_signature?: string | null;
+  page_count?: number;
 }
 
 /** Upload a WAV audio chunk for analysis. */
@@ -109,6 +112,18 @@ export async function parseScore(file: File): Promise<ScoreResult> {
   const form = new FormData();
   form.append("file", file);
   return request<ScoreResult>("/api/score/parse", { method: "POST", body: form });
+}
+
+/** Upload multiple score page images for recognition. */
+export async function parseScoreMulti(files: File[]): Promise<ScoreResult> {
+  const form = new FormData();
+  for (const file of files) {
+    form.append("files", file);
+  }
+  return request<ScoreResult>("/api/score/parse-multi", {
+    method: "POST",
+    body: form,
+  }, { timeout: 60000 });
 }
 
 /** Health check. */

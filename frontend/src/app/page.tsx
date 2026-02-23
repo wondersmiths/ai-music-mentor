@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import ScoreViewer, { Score } from "@/score/ScoreViewer";
 import { CursorController } from "@/score/CursorController";
-import { parseScore, ApiError, StopResult } from "@/lib/api";
+import { parseScore, parseScoreMulti, ApiError, StopResult } from "@/lib/api";
 import { usePractice } from "@/hooks/usePractice";
 
 // 赛马 (Horse Racing) — 黄海怀 / 沈利群
@@ -11,175 +11,177 @@ import { usePractice } from "@/hooks/usePractice";
 // Pitch mapping: 1=F4 2=G4 3=A4 5=C5 6=D5 7=E5
 const DEMO_SCORE: Score = {
   title: "赛马 (Horse Racing)",
+  notation_type: "jianpu",
+  key_signature: "1=F",
   measures: [
     // ── Opening theme: 6. 35 repeated ──
     { number: 1, time_signature: "2/4", notes: [
-      { pitch: "D5", duration: "quarter", beat: 1 },
-      { pitch: "A4", duration: "eighth", beat: 2 },
-      { pitch: "C5", duration: "eighth", beat: 2.5 },
+      { pitch: "D5", duration: "quarter", beat: 1, jianpu: "6" },
+      { pitch: "A4", duration: "eighth", beat: 2, jianpu: "3" },
+      { pitch: "C5", duration: "eighth", beat: 2.5, jianpu: "5" },
     ]},
     { number: 2, time_signature: "2/4", notes: [
-      { pitch: "D5", duration: "quarter", beat: 1 },
-      { pitch: "A4", duration: "eighth", beat: 2 },
-      { pitch: "C5", duration: "eighth", beat: 2.5 },
+      { pitch: "D5", duration: "quarter", beat: 1, jianpu: "6" },
+      { pitch: "A4", duration: "eighth", beat: 2, jianpu: "3" },
+      { pitch: "C5", duration: "eighth", beat: 2.5, jianpu: "5" },
     ]},
     { number: 3, time_signature: "2/4", notes: [
-      { pitch: "D5", duration: "quarter", beat: 1 },
-      { pitch: "A4", duration: "eighth", beat: 2 },
-      { pitch: "C5", duration: "eighth", beat: 2.5 },
+      { pitch: "D5", duration: "quarter", beat: 1, jianpu: "6" },
+      { pitch: "A4", duration: "eighth", beat: 2, jianpu: "3" },
+      { pitch: "C5", duration: "eighth", beat: 2.5, jianpu: "5" },
     ]},
     // ── Running sixteenth figures: 0535 ──
     { number: 4, time_signature: "2/4", notes: [
-      { pitch: "C5", duration: "sixteenth", beat: 1 },
-      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
-      { pitch: "C5", duration: "sixteenth", beat: 1.5 },
-      { pitch: "A4", duration: "sixteenth", beat: 1.75 },
-      { pitch: "C5", duration: "sixteenth", beat: 2 },
-      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
-      { pitch: "C5", duration: "sixteenth", beat: 2.5 },
-      { pitch: "A4", duration: "sixteenth", beat: 2.75 },
+      { pitch: "C5", duration: "sixteenth", beat: 1, jianpu: "5" },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
+      { pitch: "C5", duration: "sixteenth", beat: 1.5, jianpu: "5" },
+      { pitch: "A4", duration: "sixteenth", beat: 1.75, jianpu: "3" },
+      { pitch: "C5", duration: "sixteenth", beat: 2, jianpu: "5" },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25, jianpu: "3" },
+      { pitch: "C5", duration: "sixteenth", beat: 2.5, jianpu: "5" },
+      { pitch: "A4", duration: "sixteenth", beat: 2.75, jianpu: "3" },
     ]},
     { number: 5, time_signature: "2/4", notes: [
-      { pitch: "C5", duration: "sixteenth", beat: 1 },
-      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
-      { pitch: "C5", duration: "sixteenth", beat: 1.5 },
-      { pitch: "A4", duration: "sixteenth", beat: 1.75 },
-      { pitch: "C5", duration: "sixteenth", beat: 2 },
-      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
-      { pitch: "C5", duration: "sixteenth", beat: 2.5 },
-      { pitch: "A4", duration: "sixteenth", beat: 2.75 },
+      { pitch: "C5", duration: "sixteenth", beat: 1, jianpu: "5" },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
+      { pitch: "C5", duration: "sixteenth", beat: 1.5, jianpu: "5" },
+      { pitch: "A4", duration: "sixteenth", beat: 1.75, jianpu: "3" },
+      { pitch: "C5", duration: "sixteenth", beat: 2, jianpu: "5" },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25, jianpu: "3" },
+      { pitch: "C5", duration: "sixteenth", beat: 2.5, jianpu: "5" },
+      { pitch: "A4", duration: "sixteenth", beat: 2.75, jianpu: "3" },
     ]},
     // ── 6 56 pattern ──
     { number: 6, time_signature: "2/4", notes: [
-      { pitch: "D5", duration: "eighth", beat: 1 },
-      { pitch: "C5", duration: "eighth", beat: 1.5 },
-      { pitch: "D5", duration: "eighth", beat: 2 },
-      { pitch: "C5", duration: "eighth", beat: 2.5 },
+      { pitch: "D5", duration: "eighth", beat: 1, jianpu: "6" },
+      { pitch: "C5", duration: "eighth", beat: 1.5, jianpu: "5" },
+      { pitch: "D5", duration: "eighth", beat: 2, jianpu: "6" },
+      { pitch: "C5", duration: "eighth", beat: 2.5, jianpu: "5" },
     ]},
     { number: 7, time_signature: "2/4", notes: [
-      { pitch: "D5", duration: "eighth", beat: 1 },
-      { pitch: "C5", duration: "eighth", beat: 1.5 },
-      { pitch: "D5", duration: "eighth", beat: 2 },
-      { pitch: "C5", duration: "eighth", beat: 2.5 },
+      { pitch: "D5", duration: "eighth", beat: 1, jianpu: "6" },
+      { pitch: "C5", duration: "eighth", beat: 1.5, jianpu: "5" },
+      { pitch: "D5", duration: "eighth", beat: 2, jianpu: "6" },
+      { pitch: "C5", duration: "eighth", beat: 2.5, jianpu: "5" },
     ]},
-    // ── Descending run: 6316 ──
+    // ── Descending run: 6316̣ ──
     { number: 8, time_signature: "2/4", notes: [
-      { pitch: "D5", duration: "eighth", beat: 1 },
-      { pitch: "A4", duration: "eighth", beat: 1.5 },
-      { pitch: "F4", duration: "eighth", beat: 2 },
-      { pitch: "D4", duration: "eighth", beat: 2.5 },
+      { pitch: "D5", duration: "eighth", beat: 1, jianpu: "6" },
+      { pitch: "A4", duration: "eighth", beat: 1.5, jianpu: "3" },
+      { pitch: "F4", duration: "eighth", beat: 2, jianpu: "1" },
+      { pitch: "D4", duration: "eighth", beat: 2.5, jianpu: "6\u0323" },
     ]},
     // ── 3653 ascending ──
     { number: 9, time_signature: "2/4", notes: [
-      { pitch: "A4", duration: "eighth", beat: 1 },
-      { pitch: "D5", duration: "eighth", beat: 1.5 },
-      { pitch: "C5", duration: "eighth", beat: 2 },
-      { pitch: "A4", duration: "eighth", beat: 2.5 },
+      { pitch: "A4", duration: "eighth", beat: 1, jianpu: "3" },
+      { pitch: "D5", duration: "eighth", beat: 1.5, jianpu: "6" },
+      { pitch: "C5", duration: "eighth", beat: 2, jianpu: "5" },
+      { pitch: "A4", duration: "eighth", beat: 2.5, jianpu: "3" },
     ]},
     // ── 2321 pattern (galloping rhythm) ──
     { number: 10, time_signature: "2/4", notes: [
-      { pitch: "G4", duration: "sixteenth", beat: 1 },
-      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
-      { pitch: "G4", duration: "sixteenth", beat: 1.5 },
-      { pitch: "F4", duration: "sixteenth", beat: 1.75 },
-      { pitch: "G4", duration: "sixteenth", beat: 2 },
-      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
-      { pitch: "G4", duration: "sixteenth", beat: 2.5 },
-      { pitch: "F4", duration: "sixteenth", beat: 2.75 },
+      { pitch: "G4", duration: "sixteenth", beat: 1, jianpu: "2" },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
+      { pitch: "G4", duration: "sixteenth", beat: 1.5, jianpu: "2" },
+      { pitch: "F4", duration: "sixteenth", beat: 1.75, jianpu: "1" },
+      { pitch: "G4", duration: "sixteenth", beat: 2, jianpu: "2" },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25, jianpu: "3" },
+      { pitch: "G4", duration: "sixteenth", beat: 2.5, jianpu: "2" },
+      { pitch: "F4", duration: "sixteenth", beat: 2.75, jianpu: "1" },
     ]},
     { number: 11, time_signature: "2/4", notes: [
-      { pitch: "G4", duration: "sixteenth", beat: 1 },
-      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
-      { pitch: "G4", duration: "sixteenth", beat: 1.5 },
-      { pitch: "F4", duration: "sixteenth", beat: 1.75 },
-      { pitch: "G4", duration: "sixteenth", beat: 2 },
-      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
-      { pitch: "G4", duration: "sixteenth", beat: 2.5 },
-      { pitch: "F4", duration: "sixteenth", beat: 2.75 },
+      { pitch: "G4", duration: "sixteenth", beat: 1, jianpu: "2" },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
+      { pitch: "G4", duration: "sixteenth", beat: 1.5, jianpu: "2" },
+      { pitch: "F4", duration: "sixteenth", beat: 1.75, jianpu: "1" },
+      { pitch: "G4", duration: "sixteenth", beat: 2, jianpu: "2" },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25, jianpu: "3" },
+      { pitch: "G4", duration: "sixteenth", beat: 2.5, jianpu: "2" },
+      { pitch: "F4", duration: "sixteenth", beat: 2.75, jianpu: "1" },
     ]},
-    // ── 6316 again ──
+    // ── 6316̣ again ──
     { number: 12, time_signature: "2/4", notes: [
-      { pitch: "D5", duration: "eighth", beat: 1 },
-      { pitch: "A4", duration: "eighth", beat: 1.5 },
-      { pitch: "F4", duration: "eighth", beat: 2 },
-      { pitch: "D4", duration: "eighth", beat: 2.5 },
+      { pitch: "D5", duration: "eighth", beat: 1, jianpu: "6" },
+      { pitch: "A4", duration: "eighth", beat: 1.5, jianpu: "3" },
+      { pitch: "F4", duration: "eighth", beat: 2, jianpu: "1" },
+      { pitch: "D4", duration: "eighth", beat: 2.5, jianpu: "6\u0323" },
     ]},
     // ── 3653 ──
     { number: 13, time_signature: "2/4", notes: [
-      { pitch: "A4", duration: "eighth", beat: 1 },
-      { pitch: "D5", duration: "eighth", beat: 1.5 },
-      { pitch: "C5", duration: "eighth", beat: 2 },
-      { pitch: "A4", duration: "eighth", beat: 2.5 },
+      { pitch: "A4", duration: "eighth", beat: 1, jianpu: "3" },
+      { pitch: "D5", duration: "eighth", beat: 1.5, jianpu: "6" },
+      { pitch: "C5", duration: "eighth", beat: 2, jianpu: "5" },
+      { pitch: "A4", duration: "eighth", beat: 2.5, jianpu: "3" },
     ]},
     // ── More 2321 ──
     { number: 14, time_signature: "2/4", notes: [
-      { pitch: "G4", duration: "sixteenth", beat: 1 },
-      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
-      { pitch: "G4", duration: "sixteenth", beat: 1.5 },
-      { pitch: "F4", duration: "sixteenth", beat: 1.75 },
-      { pitch: "G4", duration: "sixteenth", beat: 2 },
-      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
-      { pitch: "G4", duration: "sixteenth", beat: 2.5 },
-      { pitch: "F4", duration: "sixteenth", beat: 2.75 },
+      { pitch: "G4", duration: "sixteenth", beat: 1, jianpu: "2" },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
+      { pitch: "G4", duration: "sixteenth", beat: 1.5, jianpu: "2" },
+      { pitch: "F4", duration: "sixteenth", beat: 1.75, jianpu: "1" },
+      { pitch: "G4", duration: "sixteenth", beat: 2, jianpu: "2" },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25, jianpu: "3" },
+      { pitch: "G4", duration: "sixteenth", beat: 2.5, jianpu: "2" },
+      { pitch: "F4", duration: "sixteenth", beat: 2.75, jianpu: "1" },
     ]},
     { number: 15, time_signature: "2/4", notes: [
-      { pitch: "G4", duration: "sixteenth", beat: 1 },
-      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
-      { pitch: "G4", duration: "sixteenth", beat: 1.5 },
-      { pitch: "F4", duration: "sixteenth", beat: 1.75 },
-      { pitch: "G4", duration: "sixteenth", beat: 2 },
-      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
-      { pitch: "G4", duration: "sixteenth", beat: 2.5 },
-      { pitch: "F4", duration: "sixteenth", beat: 2.75 },
+      { pitch: "G4", duration: "sixteenth", beat: 1, jianpu: "2" },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
+      { pitch: "G4", duration: "sixteenth", beat: 1.5, jianpu: "2" },
+      { pitch: "F4", duration: "sixteenth", beat: 1.75, jianpu: "1" },
+      { pitch: "G4", duration: "sixteenth", beat: 2, jianpu: "2" },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25, jianpu: "3" },
+      { pitch: "G4", duration: "sixteenth", beat: 2.5, jianpu: "2" },
+      { pitch: "F4", duration: "sixteenth", beat: 2.75, jianpu: "1" },
     ]},
     // ── Sustained 2. 61 section ──
     { number: 16, time_signature: "2/4", notes: [
-      { pitch: "G4", duration: "quarter", beat: 1 },
-      { pitch: "D5", duration: "eighth", beat: 2 },
-      { pitch: "F4", duration: "eighth", beat: 2.5 },
+      { pitch: "G4", duration: "quarter", beat: 1, jianpu: "2" },
+      { pitch: "D5", duration: "eighth", beat: 2, jianpu: "6" },
+      { pitch: "F4", duration: "eighth", beat: 2.5, jianpu: "1" },
     ]},
     { number: 17, time_signature: "2/4", notes: [
-      { pitch: "G4", duration: "quarter", beat: 1 },
-      { pitch: "D5", duration: "eighth", beat: 2 },
-      { pitch: "F4", duration: "eighth", beat: 2.5 },
+      { pitch: "G4", duration: "quarter", beat: 1, jianpu: "2" },
+      { pitch: "D5", duration: "eighth", beat: 2, jianpu: "6" },
+      { pitch: "F4", duration: "eighth", beat: 2.5, jianpu: "1" },
     ]},
     { number: 18, time_signature: "2/4", notes: [
-      { pitch: "G4", duration: "quarter", beat: 1 },
-      { pitch: "D5", duration: "eighth", beat: 2 },
-      { pitch: "F4", duration: "eighth", beat: 2.5 },
+      { pitch: "G4", duration: "quarter", beat: 1, jianpu: "2" },
+      { pitch: "D5", duration: "eighth", beat: 2, jianpu: "6" },
+      { pitch: "F4", duration: "eighth", beat: 2.5, jianpu: "1" },
     ]},
     { number: 19, time_signature: "2/4", notes: [
-      { pitch: "G4", duration: "quarter", beat: 1 },
-      { pitch: "D5", duration: "eighth", beat: 2 },
-      { pitch: "F4", duration: "eighth", beat: 2.5 },
+      { pitch: "G4", duration: "quarter", beat: 1, jianpu: "2" },
+      { pitch: "D5", duration: "eighth", beat: 2, jianpu: "6" },
+      { pitch: "F4", duration: "eighth", beat: 2.5, jianpu: "1" },
     ]},
     // ── Final 2321 run + cadence ──
     { number: 20, time_signature: "2/4", notes: [
-      { pitch: "G4", duration: "sixteenth", beat: 1 },
-      { pitch: "A4", duration: "sixteenth", beat: 1.25 },
-      { pitch: "G4", duration: "sixteenth", beat: 1.5 },
-      { pitch: "F4", duration: "sixteenth", beat: 1.75 },
-      { pitch: "G4", duration: "sixteenth", beat: 2 },
-      { pitch: "A4", duration: "sixteenth", beat: 2.25 },
-      { pitch: "G4", duration: "sixteenth", beat: 2.5 },
-      { pitch: "F4", duration: "sixteenth", beat: 2.75 },
+      { pitch: "G4", duration: "sixteenth", beat: 1, jianpu: "2" },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
+      { pitch: "G4", duration: "sixteenth", beat: 1.5, jianpu: "2" },
+      { pitch: "F4", duration: "sixteenth", beat: 1.75, jianpu: "1" },
+      { pitch: "G4", duration: "sixteenth", beat: 2, jianpu: "2" },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25, jianpu: "3" },
+      { pitch: "G4", duration: "sixteenth", beat: 2.5, jianpu: "2" },
+      { pitch: "F4", duration: "sixteenth", beat: 2.75, jianpu: "1" },
     ]},
     // ── Cadential measures ──
     { number: 21, time_signature: "2/4", notes: [
-      { pitch: "D5", duration: "quarter", beat: 1 },
-      { pitch: "C5", duration: "quarter", beat: 2 },
+      { pitch: "D5", duration: "quarter", beat: 1, jianpu: "6" },
+      { pitch: "C5", duration: "quarter", beat: 2, jianpu: "5" },
     ]},
     { number: 22, time_signature: "2/4", notes: [
-      { pitch: "A4", duration: "quarter", beat: 1 },
-      { pitch: "C5", duration: "quarter", beat: 2 },
+      { pitch: "A4", duration: "quarter", beat: 1, jianpu: "3" },
+      { pitch: "C5", duration: "quarter", beat: 2, jianpu: "5" },
     ]},
     { number: 23, time_signature: "2/4", notes: [
-      { pitch: "D5", duration: "quarter", beat: 1 },
-      { pitch: "A4", duration: "eighth", beat: 2 },
-      { pitch: "C5", duration: "eighth", beat: 2.5 },
+      { pitch: "D5", duration: "quarter", beat: 1, jianpu: "6" },
+      { pitch: "A4", duration: "eighth", beat: 2, jianpu: "3" },
+      { pitch: "C5", duration: "eighth", beat: 2.5, jianpu: "5" },
     ]},
     { number: 24, time_signature: "2/4", notes: [
-      { pitch: "D5", duration: "half", beat: 1 },
+      { pitch: "D5", duration: "half", beat: 1, jianpu: "6" },
     ]},
   ],
 };
@@ -225,25 +227,37 @@ export default function Home() {
 
   const handleUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
+      const fileList = e.target.files;
+      if (!fileList || fileList.length === 0) return;
 
       setUploading(true);
       setUploadError("");
       setUploadSuccess("");
 
       try {
-        const data = await parseScore(file);
-        setScore({ title: data.title, measures: data.measures });
+        const data = fileList.length > 1
+          ? await parseScoreMulti(Array.from(fileList))
+          : await parseScore(fileList[0]);
+
+        setScore({
+          title: data.title,
+          measures: data.measures,
+          notation_type: data.notation_type,
+          key_signature: data.key_signature,
+          page_count: data.page_count,
+        });
         setIsMock(data.is_mock);
+
+        const notationType = data.notation_type === "jianpu" ? "jianpu" : "western";
+        const pageInfo = (data.page_count ?? 1) > 1 ? `, ${data.page_count} pages` : "";
+
         if (data.is_mock) {
           setUploadSuccess(
-            `Score recognition confidence too low — showing demo score "${data.title}" (${data.measures.length} measures). ` +
-            `Jianpu / numbered notation is not yet supported by the OMR engine.`
+            `Score recognition confidence too low — showing demo score "${data.title}" (${data.measures.length} measures).`
           );
         } else {
           setUploadSuccess(
-            `Loaded "${data.title}" — ${data.measures.length} measures (confidence: ${Math.round(data.confidence * 100)}%)`
+            `Loaded "${data.title}" — ${data.measures.length} measures, ${notationType} notation (confidence: ${Math.round(data.confidence * 100)}%${pageInfo})`
           );
         }
       } catch (err) {
@@ -302,6 +316,7 @@ export default function Home() {
             <input
               type="file"
               accept="image/*,.pdf"
+              multiple
               onChange={handleUpload}
               style={{ display: "none" }}
               disabled={uploading || isPracticing || isBusy}

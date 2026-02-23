@@ -1,6 +1,8 @@
 /**
  * ScoreViewer — renders a structured score JSON as a visual music sheet
  * with wrapping rows, staff-like layout, and a visible moving cursor.
+ *
+ * Supports dual-label display: jianpu numbers (primary) + western pitch (secondary).
  */
 
 import React, { useEffect, useRef } from "react";
@@ -11,6 +13,7 @@ export interface ScoreNote {
   pitch: string;
   duration: string;
   beat: number;
+  jianpu?: string | null;
 }
 
 export interface ScoreMeasure {
@@ -22,6 +25,9 @@ export interface ScoreMeasure {
 export interface Score {
   title: string;
   measures: ScoreMeasure[];
+  notation_type?: string;
+  key_signature?: string | null;
+  page_count?: number;
 }
 
 export interface ScoreViewerProps {
@@ -91,131 +97,182 @@ const ScoreViewer: React.FC<ScoreViewerProps> = ({
     rows.push(score.measures.slice(i, i + MEASURES_PER_ROW));
   }
 
+  // Compute page boundaries for page separators
+  const pageCount = score.page_count ?? 1;
+  const measuresPerPage = pageCount > 1
+    ? Math.ceil(score.measures.length / pageCount)
+    : 0;
+
   return (
     <div style={s.container}>
       <div style={s.titleRow}>
-        <h2 style={s.title}>{score.title || "Untitled Score"}</h2>
-        <span style={s.measureCount}>{score.measures.length} measures</span>
+        <div style={s.titleGroup}>
+          <h2 style={s.title}>{score.title || "Untitled Score"}</h2>
+          {score.key_signature && (
+            <span style={s.keySig}>{score.key_signature}</span>
+          )}
+        </div>
+        <span style={s.measureCount}>
+          {score.measures.length} measures
+          {pageCount > 1 && ` \u00b7 ${pageCount} pages`}
+        </span>
       </div>
 
-      {rows.map((row, rowIdx) => (
-        <div key={rowIdx} style={s.staffRow}>
-          {/* Staff lines */}
-          <div style={s.staffLines}>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} style={{ ...s.staffLine, top: `${20 + i * 15}%` }} />
-            ))}
-          </div>
+      {rows.map((row, rowIdx) => {
+        const rowStartMeasure = rowIdx * MEASURES_PER_ROW;
 
-          {row.map((measure) => {
-            const isActive = measure.number === activeMeasure;
-            const beatsPerMeasure = parseTimeSig(measure.time_signature);
+        // Check if a page boundary falls right before this row
+        const showPageDivider =
+          measuresPerPage > 0 &&
+          rowStartMeasure > 0 &&
+          rowStartMeasure % measuresPerPage === 0;
 
-            return (
-              <div
-                key={measure.number}
-                ref={isActive ? activeRef : undefined}
-                style={{
-                  ...s.measure,
-                  ...(isActive ? {
-                    backgroundColor: `rgba(59, 130, 246, ${highlightOpacity * 0.06})`,
-                  } : {}),
-                }}
-              >
-                {/* Measure number */}
-                <div style={s.measureNum}>{measure.number}</div>
+        return (
+          <React.Fragment key={rowIdx}>
+            {showPageDivider && (
+              <div style={s.pageDivider}>
+                <span style={s.pageDividerLabel}>
+                  Page {Math.floor(rowStartMeasure / measuresPerPage) + 1}
+                </span>
+              </div>
+            )}
+            <div style={s.staffRow}>
+              {/* Staff lines */}
+              <div style={s.staffLines}>
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div key={i} style={{ ...s.staffLine, top: `${20 + i * 15}%` }} />
+                ))}
+              </div>
 
-                {/* Time signature (first measure of each row) */}
-                {measure.number === row[0].number && (
-                  <div style={s.timeSig}>{measure.time_signature}</div>
-                )}
+              {row.map((measure) => {
+                const isActive = measure.number === activeMeasure;
+                const beatsPerMeasure = parseTimeSig(measure.time_signature);
 
-                {/* Notes on the staff */}
-                <div style={s.noteArea}>
-                  {measure.notes.map((note, idx) => {
-                    const width = DURATION_BEATS[note.duration] ?? 1;
-                    const leftPct = ((note.beat - 1) / beatsPerMeasure) * 100;
-                    const widthPct = (width / beatsPerMeasure) * 100;
-                    const topPct = pitchToStaffY(note.pitch);
-                    const isNoteActive =
-                      isActive &&
-                      activeBeat >= note.beat &&
-                      activeBeat < note.beat + width;
+                return (
+                  <div
+                    key={measure.number}
+                    ref={isActive ? activeRef : undefined}
+                    style={{
+                      ...s.measure,
+                      ...(isActive ? {
+                        backgroundColor: `rgba(59, 130, 246, ${highlightOpacity * 0.06})`,
+                      } : {}),
+                    }}
+                  >
+                    {/* Measure number */}
+                    <div style={s.measureNum}>{measure.number}</div>
 
-                    return (
-                      <div
-                        key={idx}
-                        style={{
-                          ...s.noteContainer,
-                          left: `${leftPct}%`,
-                          width: `${widthPct}%`,
-                          top: `${topPct}%`,
-                        }}
-                      >
-                        {/* Note head */}
+                    {/* Time signature (first measure of each row) */}
+                    {measure.number === row[0].number && (
+                      <div style={s.timeSig}>{measure.time_signature}</div>
+                    )}
+
+                    {/* Notes on the staff */}
+                    <div style={s.noteArea}>
+                      {measure.notes.map((note, idx) => {
+                        const width = DURATION_BEATS[note.duration] ?? 1;
+                        const leftPct = ((note.beat - 1) / beatsPerMeasure) * 100;
+                        const widthPct = (width / beatsPerMeasure) * 100;
+                        const topPct = pitchToStaffY(note.pitch);
+                        const isNoteActive =
+                          isActive &&
+                          activeBeat >= note.beat &&
+                          activeBeat < note.beat + width;
+
+                        const hasJianpu = !!note.jianpu;
+
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              ...s.noteContainer,
+                              left: `${leftPct}%`,
+                              width: `${widthPct}%`,
+                              top: `${topPct}%`,
+                            }}
+                          >
+                            {/* Note head */}
+                            <div
+                              style={{
+                                ...s.noteHead,
+                                ...(isNoteActive ? s.noteHeadActive : {}),
+                                ...(width >= 2 ? s.noteHeadLarge : {}),
+                              }}
+                            />
+                            {/* Labels: dual (jianpu + pitch) or pitch only */}
+                            {hasJianpu ? (
+                              <>
+                                <div
+                                  style={{
+                                    ...s.jianpuLabel,
+                                    ...(isNoteActive ? s.jianpuLabelActive : {}),
+                                  }}
+                                >
+                                  {note.jianpu}
+                                </div>
+                                <div style={s.pitchSubLabel}>
+                                  {note.pitch}
+                                </div>
+                              </>
+                            ) : (
+                              <div
+                                style={{
+                                  ...s.noteLabel,
+                                  ...(isNoteActive ? s.noteLabelActive : {}),
+                                }}
+                              >
+                                {note.pitch}
+                              </div>
+                            )}
+                            {/* Duration label */}
+                            <div style={s.durLabel}>
+                              {DURATION_LABELS[note.duration] || note.duration}
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Cursor / playhead */}
+                      {isActive && highlightOpacity > 0.1 && (
                         <div
                           style={{
-                            ...s.noteHead,
-                            ...(isNoteActive ? s.noteHeadActive : {}),
-                            ...(width >= 2 ? s.noteHeadLarge : {}),
+                            ...s.cursor,
+                            left: `${((activeBeat - 1) / beatsPerMeasure) * 100}%`,
+                            opacity: highlightOpacity,
                           }}
                         />
-                        {/* Pitch label */}
-                        <div
-                          style={{
-                            ...s.noteLabel,
-                            ...(isNoteActive ? s.noteLabelActive : {}),
-                          }}
-                        >
-                          {note.pitch}
-                        </div>
-                        {/* Duration label */}
-                        <div style={s.durLabel}>
-                          {DURATION_LABELS[note.duration] || note.duration}
-                        </div>
-                      </div>
-                    );
-                  })}
+                      )}
+                    </div>
 
-                  {/* Cursor / playhead */}
-                  {isActive && highlightOpacity > 0.1 && (
-                    <div
-                      style={{
-                        ...s.cursor,
-                        left: `${((activeBeat - 1) / beatsPerMeasure) * 100}%`,
-                        opacity: highlightOpacity,
-                      }}
-                    />
-                  )}
-                </div>
+                    {/* Beat ticks below */}
+                    <div style={s.beatTicks}>
+                      {Array.from({ length: beatsPerMeasure }, (_, i) => {
+                        const beatNum = i + 1;
+                        const isBeatActive =
+                          isActive && activeBeat >= beatNum && activeBeat < beatNum + 1;
+                        return (
+                          <div
+                            key={beatNum}
+                            style={{
+                              ...s.beatTick,
+                              ...(isBeatActive ? s.beatTickActive : {}),
+                            }}
+                          >
+                            {beatNum}
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                {/* Beat ticks below */}
-                <div style={s.beatTicks}>
-                  {Array.from({ length: beatsPerMeasure }, (_, i) => {
-                    const beatNum = i + 1;
-                    const isBeatActive =
-                      isActive && activeBeat >= beatNum && activeBeat < beatNum + 1;
-                    return (
-                      <div
-                        key={beatNum}
-                        style={{
-                          ...s.beatTick,
-                          ...(isBeatActive ? s.beatTickActive : {}),
-                        }}
-                      >
-                        {beatNum}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Right barline */}
-                <div style={s.barline} />
-              </div>
-            );
-          })}
-        </div>
-      ))}
+                    {/* Right barline */}
+                    <div style={s.barline} />
+                  </div>
+                );
+              })}
+            </div>
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 };
@@ -244,11 +301,24 @@ const s: Record<string, React.CSSProperties> = {
     marginBottom: 12,
     padding: "0 4px",
   },
+  titleGroup: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: 12,
+  },
   title: {
     fontSize: 18,
     fontWeight: 600,
     margin: 0,
     color: "#1e293b",
+  },
+  keySig: {
+    fontSize: 14,
+    fontWeight: 500,
+    color: "#6366f1",
+    backgroundColor: "#eef2ff",
+    padding: "2px 8px",
+    borderRadius: 4,
   },
   measureCount: {
     fontSize: 12,
@@ -259,6 +329,23 @@ const s: Record<string, React.CSSProperties> = {
     textAlign: "center" as const,
     color: "#94a3b8",
     fontSize: 14,
+  },
+
+  // Page divider between multi-page groups
+  pageDivider: {
+    display: "flex",
+    alignItems: "center",
+    margin: "4px 0 12px 0",
+    gap: 8,
+  },
+  pageDividerLabel: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: "#94a3b8",
+    backgroundColor: "#f1f5f9",
+    padding: "2px 10px",
+    borderRadius: 10,
+    whiteSpace: "nowrap" as const,
   },
 
   // Staff row — one horizontal line of measures
@@ -354,6 +441,7 @@ const s: Record<string, React.CSSProperties> = {
   noteHeadLarge: {
     backgroundColor: "transparent",
   },
+  // Standard pitch-only label
   noteLabel: {
     fontSize: 11,
     fontWeight: 600,
@@ -365,6 +453,26 @@ const s: Record<string, React.CSSProperties> = {
   noteLabelActive: {
     color: "#2563eb",
     fontWeight: 700,
+  },
+  // Jianpu primary label (large number)
+  jianpuLabel: {
+    fontSize: 16,
+    fontWeight: 700,
+    color: "#1e293b",
+    marginTop: 1,
+    lineHeight: 1,
+    whiteSpace: "nowrap" as const,
+    transition: "color 0.15s",
+  },
+  jianpuLabelActive: {
+    color: "#2563eb",
+  },
+  // Western pitch sub-label (small, gray, below jianpu)
+  pitchSubLabel: {
+    fontSize: 9,
+    color: "#94a3b8",
+    marginTop: 0,
+    whiteSpace: "nowrap" as const,
   },
   durLabel: {
     fontSize: 9,
