@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ai.omr.detector import detect_noteheads, detect_staff_lines, estimate_confidence
-from ai.omr.jianpu import detect_notation_type, recognize_jianpu
+from ai.omr.jianpu import try_jianpu
 from ai.omr.mock import mock_score
 from ai.omr.models import ScoreResult
 from ai.omr.parser import build_measures
@@ -19,14 +19,12 @@ def recognize(
     # 2. Detect staff lines
     staff_lines = detect_staff_lines(binary)
 
-    # 3. Determine notation type
-    notation_type = detect_notation_type(binary, staff_lines)
+    # 3. Try jianpu first (single OCR pass for detection + parsing)
+    jianpu_result = try_jianpu(binary, staff_lines)
+    if jianpu_result is not None:
+        return jianpu_result
 
-    # 4. Branch by notation type
-    if notation_type == "jianpu":
-        return _recognize_jianpu(binary)
-
-    # Western pipeline
+    # 4. Western pipeline
     if not staff_lines:
         return mock_score()
 
@@ -43,23 +41,6 @@ def recognize(
         confidence=confidence,
         is_mock=False,
         measures=measures,
-    )
-
-
-def _recognize_jianpu(binary) -> ScoreResult:
-    """Run jianpu OCR pipeline, falling back to mock on failure."""
-    measures, key_sig, time_sig, confidence = recognize_jianpu(binary)
-
-    if not measures:
-        return mock_score()
-
-    return ScoreResult(
-        title="Uploaded Score",
-        confidence=confidence,
-        is_mock=False,
-        measures=measures,
-        notation_type="jianpu",
-        key_signature=key_sig,
     )
 
 

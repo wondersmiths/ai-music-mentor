@@ -4,11 +4,8 @@
  * State machine: idle → starting → practicing → stopping → done
  *
  * Frame batching: Accumulates MicCapture frames (Float32Array[2048] at 16kHz).
- * When 16 frames collected (~2.05s), encodes as WAV, POSTs to /api/practice/frame.
+ * When 4 frames collected (~0.5s), encodes as WAV, POSTs to /api/practice/frame.
  * Skips send if previous request is in-flight (accumulated frames join next chunk).
- *
- * CursorController's spring physics handle the ~2s gap between updates,
- * smoothly interpolating toward the last known position.
  */
 
 "use client";
@@ -43,7 +40,7 @@ export interface UsePracticeReturn {
 
 const FRAME_SIZE = 2048;
 const SAMPLE_RATE = 16000;
-const FRAMES_PER_CHUNK = 16; // ~2.05s at 16kHz with 2048-sample frames
+const FRAMES_PER_CHUNK = 4; // ~0.5s at 16kHz with 2048-sample frames
 
 // ── Hook ────────────────────────────────────────────────────
 

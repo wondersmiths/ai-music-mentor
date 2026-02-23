@@ -18,7 +18,7 @@ const DEFAULTS = {
   /** Samples per frame — 2048 @ 16 kHz ≈ 128 ms, good for pitch detection down to ~50 Hz */
   frameSize: 2048,
   /** ScriptProcessor buffer size (must be power of 2). Smaller = lower latency. */
-  bufferSize: 4096,
+  bufferSize: 2048,
 };
 
 export default class MicCapture {

@@ -54,25 +54,55 @@ class JianpuParseResult:
     tokens: List[JianpuToken] = field(default_factory=list)
 
 
-# ── Detection ────────────────────────────────────────────────
+# ── Detection + recognition (single OCR pass) ───────────────
 
-def detect_notation_type(binary: np.ndarray, staff_lines: list) -> str:
-    """Decide if the image contains western or jianpu notation."""
+def try_jianpu(binary: np.ndarray, staff_lines: list) -> "ScoreResult | None":
+    """Try to recognize jianpu notation; return ScoreResult or None.
+
+    Runs OCR once — uses the result for both detection and parsing.
+    Returns None if the image is not jianpu (caller falls through to
+    western pipeline).
+    """
+    from ai.omr.models import ScoreResult  # local to avoid circular
+
     if len(staff_lines) >= 5:
-        return "western"
+        return None
 
-    # No staff lines found — try OCR to check for jianpu patterns
     text = extract_jianpu_text(binary)
     if not text:
-        return "western"
+        return None
 
-    # Look for digits 1-7 (note characters) and "1=" key signature
+    # Quick check: enough digits 1-7 or key-sig pattern?
     digit_count = sum(1 for ch in text if ch in "1234567")
     has_key_sig = bool(re.search(r"1\s*=\s*[A-G]", text))
+    if not has_key_sig and digit_count < 5:
+        return None
 
-    if has_key_sig or digit_count >= 5:
-        return "jianpu"
-    return "western"
+    # It's jianpu — parse the already-extracted text
+    parsed = parse_jianpu_text(text)
+    note_count = sum(1 for t in parsed.tokens if t.kind == "note")
+    confidence = min(0.9, note_count / 50.0) if note_count > 0 else 0.0
+
+    measures = build_jianpu_measures(
+        parsed.tokens, parsed.key_sig, parsed.time_sig
+    )
+
+    if not measures:
+        return None
+
+    logger.info(
+        "Jianpu OCR: key=%s, time=%s, notes=%d, measures=%d, confidence=%.2f",
+        parsed.key_sig, parsed.time_sig, note_count, len(measures), confidence,
+    )
+
+    return ScoreResult(
+        title="Uploaded Score",
+        confidence=confidence,
+        is_mock=False,
+        measures=measures,
+        notation_type="jianpu",
+        key_signature=parsed.key_sig,
+    )
 
 
 # ── OCR extraction ───────────────────────────────────────────
@@ -370,31 +400,3 @@ def build_jianpu_measures(
     return measures
 
 
-# ── High-level entry point ───────────────────────────────────
-
-def recognize_jianpu(binary: np.ndarray) -> Tuple[List[Measure], str, str, float]:
-    """
-    Full jianpu recognition: OCR → parse → build measures.
-
-    Returns (measures, key_sig, time_sig, confidence).
-    """
-    text = extract_jianpu_text(binary)
-    if not text:
-        return [], "1=C", "4/4", 0.0
-
-    parsed = parse_jianpu_text(text)
-
-    # Estimate confidence based on how many note tokens we found
-    note_count = sum(1 for t in parsed.tokens if t.kind == "note")
-    confidence = min(0.9, note_count / 50.0) if note_count > 0 else 0.0
-
-    measures = build_jianpu_measures(
-        parsed.tokens, parsed.key_sig, parsed.time_sig
-    )
-
-    logger.info(
-        "Jianpu OCR: key=%s, time=%s, notes=%d, measures=%d, confidence=%.2f",
-        parsed.key_sig, parsed.time_sig, note_count, len(measures), confidence,
-    )
-
-    return measures, parsed.key_sig, parsed.time_sig, confidence
