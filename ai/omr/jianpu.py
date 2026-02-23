@@ -4,6 +4,13 @@ Jianpu (numbered musical notation) OCR + parser.
 Detects jianpu vs western notation, extracts text via Tesseract OCR,
 parses tokens (notes, rests, barlines), converts scale degrees to
 western pitches, and builds Measure objects.
+
+Duration inference: In printed jianpu, notes beamed together (underlined)
+appear as digit groups without spaces.  The group size determines duration:
+  - 1 digit alone  → quarter note  (1 beat)
+  - 2-digit group  → eighth notes  (0.5 beat each)
+  - 4-digit group  → sixteenth notes (0.25 beat each)
+  - 3-digit group  → eighth-note triplet (0.33 beat each, approximated)
 """
 
 from __future__ import annotations
@@ -49,7 +56,7 @@ class JianpuParseResult:
 
 # ── Detection ────────────────────────────────────────────────
 
-def detect_notation_type(binary: np.ndarray, staff_lines: list[int]) -> str:
+def detect_notation_type(binary: np.ndarray, staff_lines: list) -> str:
     """Decide if the image contains western or jianpu notation."""
     if len(staff_lines) >= 5:
         return "western"
@@ -86,101 +93,167 @@ def extract_jianpu_text(binary: np.ndarray) -> str:
             "0123456789.-|/=()#bABCDEFG "
         )
         text: str = pytesseract.image_to_string(binary, config=config)
-        logger.debug("Jianpu OCR raw text: %r", text[:200])
+        logger.debug("Jianpu OCR raw text: %r", text[:500])
         return text.strip()
     except Exception:
         logger.warning("Tesseract OCR failed", exc_info=True)
         return ""
 
 
+# ── Text cleaning ────────────────────────────────────────────
+
+def _clean_ocr_text(text: str) -> str:
+    """Remove non-musical noise from OCR output."""
+    # Remove rehearsal / measure numbers in parentheses: (60), (70), (90)
+    text = re.sub(r"\(\d+\)", "", text)
+    # Remove dynamic markings
+    text = re.sub(r"\b(pp|p|mp|mf|f|ff|sfz|cresc|dim|rit)\b", " ", text, flags=re.IGNORECASE)
+    # Remove Chinese characters (performance directions like 拉奏, 拨奏, 渐强)
+    text = re.sub(r"[\u4e00-\u9fff]+", " ", text)
+    # Remove "Re" / "re" (common OCR artifact from repeat signs)
+    text = re.sub(r"\bRe\b", " ", text)
+    # Remove stray letters that aren't part of key sig (keep only near "1=")
+    # But first protect key signature pattern
+    ks_match = re.search(r"1\s*=\s*[#b]?[A-G]", text)
+    ks_text = ""
+    if ks_match:
+        ks_text = ks_match.group(0)
+    # Remove isolated letters not near digits
+    text = re.sub(r"(?<![0-9=])[A-G](?![0-9=])", " ", text)
+    # Re-insert key sig if we removed part of it
+    if ks_text and ks_text not in text:
+        text = ks_text + " " + text
+    # Collapse multiple spaces
+    text = re.sub(r"  +", " ", text)
+    return text.strip()
+
+
 # ── Text parser ──────────────────────────────────────────────
 
 def parse_jianpu_text(text: str) -> JianpuParseResult:
-    """Parse OCR text into structured jianpu tokens."""
+    """Parse OCR text into structured jianpu tokens.
+
+    Key improvement: infer note duration from digit grouping.
+    Consecutive digits without space separation = beamed (shorter) notes.
+    """
     result = JianpuParseResult()
 
     # Extract key signature: "1=F", "1 = D", "1=#F"
     ks_match = re.search(r"1\s*=\s*([#b]?[A-G])", text)
     if ks_match:
-        result.key_sig = f"1={ks_match.group(1)}"
+        result.key_sig = "1=%s" % ks_match.group(1)
 
     # Extract time signature: "2/4", "4/4", "3/4"
     ts_match = re.search(r"([234])\s*/\s*([48])", text)
     if ts_match:
-        result.time_sig = f"{ts_match.group(1)}/{ts_match.group(2)}"
+        result.time_sig = "%s/%s" % (ts_match.group(1), ts_match.group(2))
 
-    # Tokenize the main body
-    # Remove key/time sig from text to avoid re-parsing
-    body = text
+    # Clean the text body
+    body = _clean_ocr_text(text)
+
+    # Remove key/time sig from body to avoid re-parsing digits
     if ks_match:
-        body = body[:ks_match.start()] + body[ks_match.end():]
+        body = re.sub(r"1\s*=\s*[#b]?[A-G]", " ", body, count=1)
     if ts_match:
-        # Re-search in modified body
-        ts_match2 = re.search(r"[234]\s*/\s*[48]", body)
-        if ts_match2:
-            body = body[:ts_match2.start()] + body[ts_match2.end():]
+        body = re.sub(r"[234]\s*/\s*[48]", " ", body, count=1)
 
-    i = 0
-    while i < len(body):
-        ch = body[i]
-
-        if ch in "1234567":
-            degree = int(ch)
-            octave_shift = 0
-            dotted = False
-
-            # Look ahead for octave dots and rhythmic dot
-            j = i + 1
-            while j < len(body):
-                if body[j] == ".":
-                    # Heuristic: dot right after digit = rhythmic dot first time,
-                    # then octave up on subsequent dots.
-                    # In practice, a single "." after a digit is usually rhythmic.
-                    if not dotted:
-                        dotted = True
-                    else:
-                        octave_shift += 1
-                    j += 1
-                elif body[j] == "\u0307":  # combining dot above
-                    octave_shift += 1
-                    j += 1
-                elif body[j] == "\u0323":  # combining dot below
-                    octave_shift -= 1
-                    j += 1
-                else:
-                    break
-
-            result.tokens.append(JianpuToken(
-                kind="note",
-                degree=degree,
-                octave_shift=octave_shift,
-                dotted=dotted,
-                underlines=0,  # default to quarter; underlines detected from image
-            ))
-            i = j
-
-        elif ch == "0":
-            result.tokens.append(JianpuToken(kind="rest"))
-            i += 1
-
-        elif ch == "-":
-            result.tokens.append(JianpuToken(kind="extend"))
-            i += 1
-
-        elif ch == "|":
-            result.tokens.append(JianpuToken(kind="barline"))
-            i += 1
-
-        else:
-            # Skip whitespace and unrecognized chars
-            i += 1
+    # Process line by line (OCR preserves line structure)
+    for line in body.split("\n"):
+        line = line.strip()
+        if not line:
+            continue
+        _parse_line(line, result.tokens)
 
     return result
 
 
+def _parse_line(line: str, tokens: list) -> None:
+    """Parse a single line of cleaned OCR text into tokens.
+
+    Splits on barlines first, then on spaces within each segment
+    to identify digit groups.
+    """
+    # Split on barline characters
+    segments = re.split(r"\|", line)
+
+    for seg_idx, segment in enumerate(segments):
+        # Add barline between segments (not before first)
+        if seg_idx > 0:
+            tokens.append(JianpuToken(kind="barline"))
+
+        segment = segment.strip()
+        if not segment:
+            continue
+
+        # Split segment into space-separated groups
+        groups = segment.split()
+
+        for group in groups:
+            _parse_group(group, tokens)
+
+
+def _parse_group(group: str, tokens: list) -> None:
+    """Parse a space-separated group into tokens.
+
+    A group like "3235" = 4 beamed notes (sixteenths).
+    A group like "35" = 2 beamed notes (eighths).
+    A group like "6." = dotted quarter.
+    A group like "6" = quarter note.
+    A group like "0" = rest.
+    A group like "-" = extend.
+    """
+    # Strip non-musical chars
+    group = group.strip()
+    if not group:
+        return
+
+    # Pure extend dashes
+    if re.fullmatch(r"-+", group):
+        for _ in group:
+            tokens.append(JianpuToken(kind="extend"))
+        return
+
+    # Check for dotted note: single digit followed by dot, e.g. "6."
+    dot_match = re.fullmatch(r"([0-7])\.+", group)
+    if dot_match:
+        d = int(dot_match.group(1))
+        if d == 0:
+            tokens.append(JianpuToken(kind="rest"))
+        else:
+            tokens.append(JianpuToken(kind="note", degree=d, dotted=True, underlines=0))
+        return
+
+    # Extract only digits and zeros from the group
+    digits = [ch for ch in group if ch in "01234567"]
+
+    if not digits:
+        return
+
+    # Determine underlines (duration) from group size
+    n = len(digits)
+    if n == 1:
+        underlines = 0  # quarter
+    elif n == 2:
+        underlines = 1  # eighth
+    elif n == 3:
+        underlines = 1  # treat triplet as eighths (approximate)
+    elif n >= 4:
+        underlines = 2  # sixteenth
+    else:
+        underlines = 0
+
+    for ch in digits:
+        d = int(ch)
+        if d == 0:
+            tokens.append(JianpuToken(kind="rest", underlines=underlines))
+        elif 1 <= d <= 7:
+            tokens.append(JianpuToken(kind="note", degree=d, underlines=underlines))
+        # Skip 8, 9 (OCR noise)
+
+
 # ── Pitch conversion ─────────────────────────────────────────
 
-def jianpu_to_pitch(degree: int, octave_shift: int, tonic: str) -> tuple[str, str]:
+def jianpu_to_pitch(degree: int, octave_shift: int, tonic: str) -> Tuple[str, str]:
     """
     Convert jianpu degree + octave to (western_pitch, jianpu_label).
 
@@ -202,7 +275,7 @@ def jianpu_to_pitch(degree: int, octave_shift: int, tonic: str) -> tuple[str, st
     # Convert MIDI to pitch name
     note_name = NOTE_NAMES[midi % 12]
     octave = (midi // 12) - 1
-    western = f"{note_name}{octave}"
+    western = "%s%d" % (note_name, octave)
 
     # Build jianpu display label with Unicode combining dots
     label = str(degree)
@@ -217,10 +290,10 @@ def jianpu_to_pitch(degree: int, octave_shift: int, tonic: str) -> tuple[str, st
 # ── Measure builder ──────────────────────────────────────────
 
 def build_jianpu_measures(
-    tokens: list[JianpuToken],
+    tokens: list,
     key_sig: str,
     time_sig: str,
-) -> list[Measure]:
+) -> List[Measure]:
     """Group tokens into measures by barlines and assign beat positions."""
     # Parse tonic from key sig (e.g. "1=F" → "F")
     ks_match = re.match(r"1=([#b]?[A-G])", key_sig)
@@ -230,22 +303,26 @@ def build_jianpu_measures(
     ts_parts = time_sig.split("/")
     beats_per_measure = int(ts_parts[0]) if len(ts_parts) == 2 else 4
 
-    measures: list[Measure] = []
-    current_notes: list[Note] = []
+    measures = []  # type: List[Measure]
+    current_notes = []  # type: List[Note]
     current_beat = 1.0
     measure_num = 1
 
+    def _flush():
+        nonlocal measure_num, current_notes, current_beat
+        if current_notes:
+            measures.append(Measure(
+                number=measure_num,
+                time_signature=time_sig,
+                notes=current_notes,
+            ))
+            measure_num += 1
+            current_notes = []
+            current_beat = 1.0
+
     for token in tokens:
         if token.kind == "barline":
-            if current_notes:
-                measures.append(Measure(
-                    number=measure_num,
-                    time_signature=time_sig,
-                    notes=current_notes,
-                ))
-                measure_num += 1
-                current_notes = []
-                current_beat = 1.0
+            _flush()
             continue
 
         if token.kind == "note":
@@ -269,33 +346,33 @@ def build_jianpu_measures(
             current_notes.append(Note(
                 pitch=western,
                 duration=dur_name,
-                beat=current_beat,
+                beat=round(current_beat, 4),
                 jianpu=jianpu_label,
             ))
             current_beat += dur_beats
 
         elif token.kind == "rest":
-            # Rest = advance by one beat (quarter)
-            current_beat += 1.0
+            # Rest duration matches the context underlines
+            if token.underlines == 0:
+                current_beat += 1.0
+            elif token.underlines == 1:
+                current_beat += 0.5
+            else:
+                current_beat += 0.25
 
         elif token.kind == "extend":
             # Extend previous note by one beat (dash = held note)
             current_beat += 1.0
 
     # Flush remaining notes as final measure
-    if current_notes:
-        measures.append(Measure(
-            number=measure_num,
-            time_signature=time_sig,
-            notes=current_notes,
-        ))
+    _flush()
 
     return measures
 
 
 # ── High-level entry point ───────────────────────────────────
 
-def recognize_jianpu(binary: np.ndarray) -> tuple[list[Measure], str, str, float]:
+def recognize_jianpu(binary: np.ndarray) -> Tuple[List[Measure], str, str, float]:
     """
     Full jianpu recognition: OCR → parse → build measures.
 

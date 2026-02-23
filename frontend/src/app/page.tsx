@@ -253,7 +253,7 @@ export default function Home() {
 
         if (data.is_mock) {
           setUploadSuccess(
-            `Score recognition confidence too low — showing demo score "${data.title}" (${data.measures.length} measures).`
+            `Score recognition confidence too low — showing demo score "${data.title}" (${data.measures.length} measures, ${notationType} notation).`
           );
         } else {
           setUploadSuccess(
