@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import ScoreViewer, { Score } from "@/score/ScoreViewer";
 import { CursorController } from "@/score/CursorController";
 import { parseScore, parseScoreMulti, ApiError, StopResult } from "@/lib/api";
-import { usePractice } from "@/hooks/usePractice";
+import { usePractice, PracticeMode } from "@/hooks/usePractice";
 
 // 赛马 (Horse Racing) — 黄海怀 / 沈利群
 // Jianpu: 1=F (F major), 2/4 time, ~130 BPM
@@ -195,6 +195,8 @@ export default function Home() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState("");
+  const [bpm, setBpm] = useState(120);
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>("follow");
   const cursorRef = useRef<CursorController | null>(null);
 
   // Parse beats-per-measure from time signature (e.g. "2/4" → 2)
@@ -223,7 +225,7 @@ export default function Home() {
     is_mock: false,
     measures: score.measures,
   };
-  const practice = usePractice(scoreForApi, cursorRef);
+  const practice = usePractice(scoreForApi, cursorRef, bpm, practiceMode);
 
   const handleUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -325,11 +327,57 @@ export default function Home() {
         </div>
       </header>
 
+      {/* Practice controls */}
+      <div style={styles.practiceControls}>
+        <label style={styles.bpmLabel}>
+          BPM:
+          <input
+            type="number"
+            min={40}
+            max={240}
+            step={1}
+            value={bpm}
+            onChange={(e) => setBpm(Math.max(40, Math.min(240, Number(e.target.value) || 40)))}
+            disabled={isPracticing || isBusy}
+            style={{
+              ...styles.bpmInput,
+              ...(isPracticing || isBusy ? styles.controlDisabled : {}),
+            }}
+          />
+        </label>
+        <div style={styles.modeToggle}>
+          <button
+            style={{
+              ...styles.modeBtn,
+              ...(practiceMode === "follow" ? styles.modeBtnActive : {}),
+              ...(isPracticing || isBusy ? styles.controlDisabled : {}),
+            }}
+            onClick={() => setPracticeMode("follow")}
+            disabled={isPracticing || isBusy}
+          >
+            Follow
+          </button>
+          <button
+            style={{
+              ...styles.modeBtn,
+              ...(practiceMode === "guided" ? styles.modeBtnActiveGuided : {}),
+              ...(isPracticing || isBusy ? styles.controlDisabled : {}),
+            }}
+            onClick={() => setPracticeMode("guided")}
+            disabled={isPracticing || isBusy}
+          >
+            Guided
+          </button>
+        </div>
+      </div>
+
       {/* Status indicators */}
       {isPracticing && (
         <div style={styles.status}>
           <span style={styles.statusDot} />
-          Listening... ({practice.elapsed.toFixed(1)}s)
+          {practiceMode === "guided"
+            ? `Guided... (${bpm} BPM, ${practice.elapsed.toFixed(1)}s)`
+            : `Listening... (Follow, ${bpm} BPM, ${practice.elapsed.toFixed(1)}s)`}
         </div>
       )}
       {practice.state === "stopping" && (
@@ -534,6 +582,56 @@ const styles: Record<string, React.CSSProperties> = {
   btnDisabled: {
     opacity: 0.5,
     pointerEvents: "none" as const,
+  },
+  practiceControls: {
+    display: "flex",
+    alignItems: "center",
+    gap: 16,
+    marginBottom: 16,
+  },
+  bpmLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontSize: 14,
+    fontWeight: 500,
+    color: "#475569",
+  },
+  bpmInput: {
+    width: 64,
+    padding: "4px 8px",
+    border: "1px solid #cbd5e1",
+    borderRadius: 6,
+    fontSize: 14,
+    textAlign: "center" as const,
+    outline: "none",
+  },
+  modeToggle: {
+    display: "flex",
+    borderRadius: 6,
+    overflow: "hidden",
+    border: "1px solid #cbd5e1",
+  },
+  modeBtn: {
+    padding: "4px 14px",
+    fontSize: 13,
+    fontWeight: 500,
+    border: "none",
+    backgroundColor: "#fff",
+    color: "#64748b",
+    cursor: "pointer",
+  },
+  modeBtnActive: {
+    backgroundColor: "#22c55e",
+    color: "#fff",
+  },
+  modeBtnActiveGuided: {
+    backgroundColor: "#8b5cf6",
+    color: "#fff",
+  },
+  controlDisabled: {
+    opacity: 0.5,
+    cursor: "default",
   },
   status: {
     display: "flex",

@@ -44,10 +44,13 @@ const FRAMES_PER_CHUNK = 4; // ~0.5s at 16kHz with 2048-sample frames
 
 // ── Hook ────────────────────────────────────────────────────
 
+export type PracticeMode = "follow" | "guided";
+
 export function usePractice(
   score: ScoreResult,
   cursorRef: React.RefObject<CursorController | null>,
   bpm: number = 120,
+  mode: PracticeMode = "follow",
 ): UsePracticeReturn {
   const [state, setState] = useState<PracticeState>("idle");
   const [feedback, setFeedback] = useState<StopResult | null>(null);
@@ -59,11 +62,17 @@ export function usePractice(
   const bufferRef = useRef<Float32Array[]>([]);
   const inflightRef = useRef(false);
   const stateRef = useRef<PracticeState>("idle");
+  const modeRef = useRef<PracticeMode>(mode);
+  const autoStopRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const stopRef = useRef<() => void>(() => {});
 
-  // Keep stateRef in sync
+  // Keep refs in sync
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
 
   // Send accumulated frames to backend
   const flushFrames = useCallback(async () => {
@@ -88,8 +97,8 @@ export function usePractice(
       const result = await sendPracticeFrame(sessionId, wavBlob);
       setElapsed(result.elapsed_s);
 
-      // Feed alignment to CursorController
-      if (cursorRef.current) {
+      // Feed alignment to CursorController (skipped in guided mode — cursor self-drives)
+      if (cursorRef.current && modeRef.current !== "guided") {
         cursorRef.current.update({
           current_measure: result.alignment.current_measure,
           current_beat: result.alignment.current_beat,
@@ -133,10 +142,17 @@ export function usePractice(
       const resp = await startPractice(score, bpm);
       sessionIdRef.current = resp.session_id;
 
-      // Reset cursor
+      // Reset and start cursor
       if (cursorRef.current) {
         cursorRef.current.reset();
-        cursorRef.current.start();
+        if (mode === "guided") {
+          const beatsPerMeasure = score.measures[0]?.time_signature
+            ? parseInt(score.measures[0].time_signature.split("/")[0], 10) || 4
+            : 4;
+          cursorRef.current.startGuided(bpm, beatsPerMeasure, score.measures.length);
+        } else {
+          cursorRef.current.start();
+        }
       }
 
       // Start mic capture
@@ -149,6 +165,20 @@ export function usePractice(
       micRef.current = mic;
 
       setState("practicing");
+
+      // Auto-stop in guided mode when cursor reaches end of score
+      if (mode === "guided") {
+        autoStopRef.current = setInterval(() => {
+          if (cursorRef.current?.getPosition().complete) {
+            if (autoStopRef.current) clearInterval(autoStopRef.current);
+            autoStopRef.current = null;
+            // Use stateRef to avoid stale closure
+            if (stateRef.current === "practicing") {
+              stopRef.current();
+            }
+          }
+        }, 200);
+      }
     } catch (err) {
       const msg = err instanceof ApiError
         ? err.detail
@@ -159,13 +189,19 @@ export function usePractice(
       setState("idle");
       sessionIdRef.current = null;
     }
-  }, [state, score, bpm, cursorRef, onFrame]);
+  }, [state, score, bpm, mode, cursorRef, onFrame]);
 
   // Stop practice
   const stop = useCallback(async () => {
     if (state !== "practicing") return;
 
     setState("stopping");
+
+    // Clear auto-stop interval
+    if (autoStopRef.current) {
+      clearInterval(autoStopRef.current);
+      autoStopRef.current = null;
+    }
 
     // Stop mic first
     if (micRef.current) {
@@ -198,12 +234,21 @@ export function usePractice(
     }
   }, [state, cursorRef]);
 
+  // Keep stopRef in sync with latest stop function
+  useEffect(() => {
+    stopRef.current = stop;
+  }, [stop]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (micRef.current) {
         micRef.current.stop();
         micRef.current = null;
+      }
+      if (autoStopRef.current) {
+        clearInterval(autoStopRef.current);
+        autoStopRef.current = null;
       }
     };
   }, []);

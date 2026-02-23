@@ -98,6 +98,13 @@ export class CursorController {
   // External render callback
   private onRender: ((pos: CursorPosition) => void) | null = null;
 
+  // Guided mode state
+  private guidedMode = false;
+  private guidedBpm = 120;
+  private guidedBeatsPerMeasure = 4;
+  private guidedTotalMeasures = 0;
+  private guidedStartTime = 0;
+
   constructor(config?: Partial<CursorConfig>) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
@@ -116,8 +123,12 @@ export class CursorController {
   /**
    * Feed an alignment update from the backend. Call this whenever
    * a new AlignmentState arrives (typically on each detected onset).
+   * In guided mode, alignment updates are ignored for cursor positioning.
    */
   update(alignment: AlignmentUpdate): void {
+    // In guided mode, cursor position is self-driven — ignore alignment
+    if (this.guidedMode) return;
+
     const now = performance.now() / 1000;
     this.currentConfidence = alignment.confidence;
     this.complete = alignment.is_complete;
@@ -169,12 +180,25 @@ export class CursorController {
     this.tick();
   }
 
+  /** Start guided mode: cursor auto-advances at the given BPM. */
+  startGuided(bpm: number, beatsPerMeasure: number, totalMeasures: number): void {
+    this.guidedMode = true;
+    this.guidedBpm = bpm;
+    this.guidedBeatsPerMeasure = beatsPerMeasure;
+    this.guidedTotalMeasures = totalMeasures;
+    this.guidedStartTime = performance.now() / 1000;
+    this.tracking = true;
+    this.opacity = 1.0;
+    this.start();
+  }
+
   /** Stop the animation loop. */
   stop(): void {
     if (this.animId !== null) {
       cancelAnimationFrame(this.animId);
       this.animId = null;
     }
+    this.guidedMode = false;
   }
 
   /** Reset to the beginning of the score. */
@@ -189,6 +213,8 @@ export class CursorController {
     this.lastTargetPos = 0;
     this.secPerBeat = 0.5;
     this.complete = false;
+    this.guidedMode = false;
+    this.guidedStartTime = 0;
   }
 
   /** Get the current cursor position synchronously. */
@@ -208,8 +234,27 @@ export class CursorController {
     const dt = Math.min(now - this.lastFrameTime, 0.05); // cap at 50ms
     this.lastFrameTime = now;
 
-    this.stepSpring(dt);
-    this.stepOpacity(dt);
+    if (this.guidedMode) {
+      // Guided mode: position driven by wall-clock time + BPM
+      const elapsed = now - this.guidedStartTime;
+      const beatsElapsed = elapsed * (this.guidedBpm / 60);
+      const position = beatsElapsed / this.guidedBeatsPerMeasure;
+
+      if (position >= this.guidedTotalMeasures) {
+        this.currentPos = this.guidedTotalMeasures;
+        this.targetPos = this.guidedTotalMeasures;
+        this.complete = true;
+      } else {
+        this.currentPos = position;
+        this.targetPos = position;
+      }
+
+      this.tracking = true;
+      this.opacity = 1.0;
+    } else {
+      this.stepSpring(dt);
+      this.stepOpacity(dt);
+    }
 
     if (this.onRender) {
       this.onRender(this.getPosition());
