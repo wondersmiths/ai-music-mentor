@@ -1,6 +1,10 @@
 import cv2
 import numpy as np
 
+# A4 sheet music at 300 DPI is roughly 2480 x 3508 pixels.
+# Use the shorter dimension as the reference for upscaling.
+TARGET_MIN_DIM = 2480
+
 
 def load_image(path: str) -> np.ndarray:
     """Load an image (PNG/JPG) or the first page of a PDF and return as grayscale."""
@@ -14,7 +18,22 @@ def load_image(path: str) -> np.ndarray:
     img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     if img is None:
         raise FileNotFoundError(f"Could not load image: {path}")
-    return img
+    return _upscale_if_needed(img)
+
+
+def _upscale_if_needed(img: np.ndarray) -> np.ndarray:
+    """Upscale low-resolution images to ~300 DPI equivalent.
+
+    Most phone photos and scans arrive at 72–150 DPI.  Upscaling to a
+    resolution comparable to the 300 DPI used for PDF extraction improves
+    staff-line detection and notehead contour analysis.
+    """
+    min_dim = min(img.shape[:2])
+    if min_dim >= TARGET_MIN_DIM:
+        return img
+
+    scale = TARGET_MIN_DIM / min_dim
+    return cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
 
 
 def preprocess(image: np.ndarray) -> np.ndarray:

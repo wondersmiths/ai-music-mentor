@@ -30,17 +30,12 @@ const DEMO_SCORE: Score = {
       { pitch: "A4", duration: "eighth", beat: 2, jianpu: "3" },
       { pitch: "C5", duration: "eighth", beat: 2.5, jianpu: "5" },
     ]},
-    // ── Running sixteenth figures: 0535 ──
     { number: 4, time_signature: "2/4", notes: [
-      { pitch: "C5", duration: "sixteenth", beat: 1, jianpu: "5" },
-      { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
-      { pitch: "C5", duration: "sixteenth", beat: 1.5, jianpu: "5" },
-      { pitch: "A4", duration: "sixteenth", beat: 1.75, jianpu: "3" },
-      { pitch: "C5", duration: "sixteenth", beat: 2, jianpu: "5" },
-      { pitch: "A4", duration: "sixteenth", beat: 2.25, jianpu: "3" },
-      { pitch: "C5", duration: "sixteenth", beat: 2.5, jianpu: "5" },
-      { pitch: "A4", duration: "sixteenth", beat: 2.75, jianpu: "3" },
+      { pitch: "D5", duration: "quarter", beat: 1, jianpu: "6" },
+      { pitch: "A4", duration: "eighth", beat: 2, jianpu: "3" },
+      { pitch: "C5", duration: "eighth", beat: 2.5, jianpu: "5" },
     ]},
+    // ── Running sixteenth figures: 0535 ──
     { number: 5, time_signature: "2/4", notes: [
       { pitch: "C5", duration: "sixteenth", beat: 1, jianpu: "5" },
       { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
@@ -51,44 +46,44 @@ const DEMO_SCORE: Score = {
       { pitch: "C5", duration: "sixteenth", beat: 2.5, jianpu: "5" },
       { pitch: "A4", duration: "sixteenth", beat: 2.75, jianpu: "3" },
     ]},
-    // ── 6 56 pattern ──
     { number: 6, time_signature: "2/4", notes: [
-      { pitch: "D5", duration: "eighth", beat: 1, jianpu: "6" },
-      { pitch: "C5", duration: "eighth", beat: 1.5, jianpu: "5" },
-      { pitch: "D5", duration: "eighth", beat: 2, jianpu: "6" },
-      { pitch: "C5", duration: "eighth", beat: 2.5, jianpu: "5" },
+      { pitch: "C5", duration: "sixteenth", beat: 1, jianpu: "5" },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
+      { pitch: "C5", duration: "sixteenth", beat: 1.5, jianpu: "5" },
+      { pitch: "A4", duration: "sixteenth", beat: 1.75, jianpu: "3" },
+      { pitch: "C5", duration: "sixteenth", beat: 2, jianpu: "5" },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25, jianpu: "3" },
+      { pitch: "C5", duration: "sixteenth", beat: 2.5, jianpu: "5" },
+      { pitch: "A4", duration: "sixteenth", beat: 2.75, jianpu: "3" },
     ]},
+    // ── 6 56 pattern ──
     { number: 7, time_signature: "2/4", notes: [
       { pitch: "D5", duration: "eighth", beat: 1, jianpu: "6" },
       { pitch: "C5", duration: "eighth", beat: 1.5, jianpu: "5" },
       { pitch: "D5", duration: "eighth", beat: 2, jianpu: "6" },
       { pitch: "C5", duration: "eighth", beat: 2.5, jianpu: "5" },
     ]},
-    // ── Descending run: 6316̣ ──
     { number: 8, time_signature: "2/4", notes: [
+      { pitch: "D5", duration: "eighth", beat: 1, jianpu: "6" },
+      { pitch: "C5", duration: "eighth", beat: 1.5, jianpu: "5" },
+      { pitch: "D5", duration: "eighth", beat: 2, jianpu: "6" },
+      { pitch: "C5", duration: "eighth", beat: 2.5, jianpu: "5" },
+    ]},
+    // ── Descending run: 6316̣ ──
+    { number: 9, time_signature: "2/4", notes: [
       { pitch: "D5", duration: "eighth", beat: 1, jianpu: "6" },
       { pitch: "A4", duration: "eighth", beat: 1.5, jianpu: "3" },
       { pitch: "F4", duration: "eighth", beat: 2, jianpu: "1" },
       { pitch: "D4", duration: "eighth", beat: 2.5, jianpu: "6\u0323" },
     ]},
     // ── 3653 ascending ──
-    { number: 9, time_signature: "2/4", notes: [
+    { number: 10, time_signature: "2/4", notes: [
       { pitch: "A4", duration: "eighth", beat: 1, jianpu: "3" },
       { pitch: "D5", duration: "eighth", beat: 1.5, jianpu: "6" },
       { pitch: "C5", duration: "eighth", beat: 2, jianpu: "5" },
       { pitch: "A4", duration: "eighth", beat: 2.5, jianpu: "3" },
     ]},
     // ── 2321 pattern (galloping rhythm) ──
-    { number: 10, time_signature: "2/4", notes: [
-      { pitch: "G4", duration: "sixteenth", beat: 1, jianpu: "2" },
-      { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
-      { pitch: "G4", duration: "sixteenth", beat: 1.5, jianpu: "2" },
-      { pitch: "F4", duration: "sixteenth", beat: 1.75, jianpu: "1" },
-      { pitch: "G4", duration: "sixteenth", beat: 2, jianpu: "2" },
-      { pitch: "A4", duration: "sixteenth", beat: 2.25, jianpu: "3" },
-      { pitch: "G4", duration: "sixteenth", beat: 2.5, jianpu: "2" },
-      { pitch: "F4", duration: "sixteenth", beat: 2.75, jianpu: "1" },
-    ]},
     { number: 11, time_signature: "2/4", notes: [
       { pitch: "G4", duration: "sixteenth", beat: 1, jianpu: "2" },
       { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
@@ -99,22 +94,7 @@ const DEMO_SCORE: Score = {
       { pitch: "G4", duration: "sixteenth", beat: 2.5, jianpu: "2" },
       { pitch: "F4", duration: "sixteenth", beat: 2.75, jianpu: "1" },
     ]},
-    // ── 6316̣ again ──
     { number: 12, time_signature: "2/4", notes: [
-      { pitch: "D5", duration: "eighth", beat: 1, jianpu: "6" },
-      { pitch: "A4", duration: "eighth", beat: 1.5, jianpu: "3" },
-      { pitch: "F4", duration: "eighth", beat: 2, jianpu: "1" },
-      { pitch: "D4", duration: "eighth", beat: 2.5, jianpu: "6\u0323" },
-    ]},
-    // ── 3653 ──
-    { number: 13, time_signature: "2/4", notes: [
-      { pitch: "A4", duration: "eighth", beat: 1, jianpu: "3" },
-      { pitch: "D5", duration: "eighth", beat: 1.5, jianpu: "6" },
-      { pitch: "C5", duration: "eighth", beat: 2, jianpu: "5" },
-      { pitch: "A4", duration: "eighth", beat: 2.5, jianpu: "3" },
-    ]},
-    // ── More 2321 ──
-    { number: 14, time_signature: "2/4", notes: [
       { pitch: "G4", duration: "sixteenth", beat: 1, jianpu: "2" },
       { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
       { pitch: "G4", duration: "sixteenth", beat: 1.5, jianpu: "2" },
@@ -124,6 +104,21 @@ const DEMO_SCORE: Score = {
       { pitch: "G4", duration: "sixteenth", beat: 2.5, jianpu: "2" },
       { pitch: "F4", duration: "sixteenth", beat: 2.75, jianpu: "1" },
     ]},
+    // ── 6316̣ again ──
+    { number: 13, time_signature: "2/4", notes: [
+      { pitch: "D5", duration: "eighth", beat: 1, jianpu: "6" },
+      { pitch: "A4", duration: "eighth", beat: 1.5, jianpu: "3" },
+      { pitch: "F4", duration: "eighth", beat: 2, jianpu: "1" },
+      { pitch: "D4", duration: "eighth", beat: 2.5, jianpu: "6\u0323" },
+    ]},
+    // ── 3653 ──
+    { number: 14, time_signature: "2/4", notes: [
+      { pitch: "A4", duration: "eighth", beat: 1, jianpu: "3" },
+      { pitch: "D5", duration: "eighth", beat: 1.5, jianpu: "6" },
+      { pitch: "C5", duration: "eighth", beat: 2, jianpu: "5" },
+      { pitch: "A4", duration: "eighth", beat: 2.5, jianpu: "3" },
+    ]},
+    // ── More 2321 ──
     { number: 15, time_signature: "2/4", notes: [
       { pitch: "G4", duration: "sixteenth", beat: 1, jianpu: "2" },
       { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
@@ -134,12 +129,17 @@ const DEMO_SCORE: Score = {
       { pitch: "G4", duration: "sixteenth", beat: 2.5, jianpu: "2" },
       { pitch: "F4", duration: "sixteenth", beat: 2.75, jianpu: "1" },
     ]},
-    // ── Sustained 2. 61 section ──
     { number: 16, time_signature: "2/4", notes: [
-      { pitch: "G4", duration: "quarter", beat: 1, jianpu: "2" },
-      { pitch: "D5", duration: "eighth", beat: 2, jianpu: "6" },
-      { pitch: "F4", duration: "eighth", beat: 2.5, jianpu: "1" },
+      { pitch: "G4", duration: "sixteenth", beat: 1, jianpu: "2" },
+      { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
+      { pitch: "G4", duration: "sixteenth", beat: 1.5, jianpu: "2" },
+      { pitch: "F4", duration: "sixteenth", beat: 1.75, jianpu: "1" },
+      { pitch: "G4", duration: "sixteenth", beat: 2, jianpu: "2" },
+      { pitch: "A4", duration: "sixteenth", beat: 2.25, jianpu: "3" },
+      { pitch: "G4", duration: "sixteenth", beat: 2.5, jianpu: "2" },
+      { pitch: "F4", duration: "sixteenth", beat: 2.75, jianpu: "1" },
     ]},
+    // ── Sustained 2. 61 section ──
     { number: 17, time_signature: "2/4", notes: [
       { pitch: "G4", duration: "quarter", beat: 1, jianpu: "2" },
       { pitch: "D5", duration: "eighth", beat: 2, jianpu: "6" },
@@ -155,8 +155,13 @@ const DEMO_SCORE: Score = {
       { pitch: "D5", duration: "eighth", beat: 2, jianpu: "6" },
       { pitch: "F4", duration: "eighth", beat: 2.5, jianpu: "1" },
     ]},
-    // ── Final 2321 run + cadence ──
     { number: 20, time_signature: "2/4", notes: [
+      { pitch: "G4", duration: "quarter", beat: 1, jianpu: "2" },
+      { pitch: "D5", duration: "eighth", beat: 2, jianpu: "6" },
+      { pitch: "F4", duration: "eighth", beat: 2.5, jianpu: "1" },
+    ]},
+    // ── Final 2321 run + cadence ──
+    { number: 21, time_signature: "2/4", notes: [
       { pitch: "G4", duration: "sixteenth", beat: 1, jianpu: "2" },
       { pitch: "A4", duration: "sixteenth", beat: 1.25, jianpu: "3" },
       { pitch: "G4", duration: "sixteenth", beat: 1.5, jianpu: "2" },
@@ -167,20 +172,20 @@ const DEMO_SCORE: Score = {
       { pitch: "F4", duration: "sixteenth", beat: 2.75, jianpu: "1" },
     ]},
     // ── Cadential measures ──
-    { number: 21, time_signature: "2/4", notes: [
+    { number: 22, time_signature: "2/4", notes: [
       { pitch: "D5", duration: "quarter", beat: 1, jianpu: "6" },
       { pitch: "C5", duration: "quarter", beat: 2, jianpu: "5" },
     ]},
-    { number: 22, time_signature: "2/4", notes: [
+    { number: 23, time_signature: "2/4", notes: [
       { pitch: "A4", duration: "quarter", beat: 1, jianpu: "3" },
       { pitch: "C5", duration: "quarter", beat: 2, jianpu: "5" },
     ]},
-    { number: 23, time_signature: "2/4", notes: [
+    { number: 24, time_signature: "2/4", notes: [
       { pitch: "D5", duration: "quarter", beat: 1, jianpu: "6" },
       { pitch: "A4", duration: "eighth", beat: 2, jianpu: "3" },
       { pitch: "C5", duration: "eighth", beat: 2.5, jianpu: "5" },
     ]},
-    { number: 24, time_signature: "2/4", notes: [
+    { number: 25, time_signature: "2/4", notes: [
       { pitch: "D5", duration: "half", beat: 1, jianpu: "6" },
     ]},
   ],
