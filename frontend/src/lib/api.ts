@@ -111,7 +111,7 @@ export async function analyzeAudio(wavBlob: Blob): Promise<AnalysisResult> {
 export async function parseScore(file: File): Promise<ScoreResult> {
   const form = new FormData();
   form.append("file", file);
-  return request<ScoreResult>("/api/score/parse", { method: "POST", body: form });
+  return request<ScoreResult>("/api/score/parse", { method: "POST", body: form }, { timeout: 90000 });
 }
 
 /** Upload multiple score page images for recognition. */
@@ -123,7 +123,7 @@ export async function parseScoreMulti(files: File[]): Promise<ScoreResult> {
   return request<ScoreResult>("/api/score/parse-multi", {
     method: "POST",
     body: form,
-  }, { timeout: 60000 });
+  }, { timeout: 90000 });
 }
 
 /** Health check. */
