@@ -6,12 +6,20 @@ from ai.omr.mock import mock_score
 from ai.omr.models import ScoreResult
 from ai.omr.parser import build_measures
 from ai.omr.preprocessor import load_image, preprocess
+from ai.omr.vision import recognize_with_vision
+from backend.config import settings
 
 
 def recognize(
     file_path: str, confidence_threshold: float = 0.6
 ) -> ScoreResult:
-    """Full OMR pipeline: load, detect, parse, or fall back to mock."""
+    """Full OMR pipeline: vision first, then CV, then mock fallback."""
+    # 0. Try Claude Vision if API key is configured
+    if settings.ANTHROPIC_API_KEY:
+        result = recognize_with_vision(file_path)
+        if result is not None:
+            return result
+
     # 1. Load and preprocess
     raw = load_image(file_path)
     binary = preprocess(raw)

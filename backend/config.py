@@ -33,6 +33,9 @@ class Config:
     TARGET_SAMPLE_RATE: int = 16000
     FRAME_SIZE: int = 2048
 
+    # ── AI / Vision ────────────────────────────────────────────
+    ANTHROPIC_API_KEY: str = ""  # empty = vision OMR disabled
+
     # ── App ──────────────────────────────────────────────────
     APP_VERSION: str = "0.2.0"
     ENVIRONMENT: str = "development"  # development | staging | production
