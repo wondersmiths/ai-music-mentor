@@ -8,6 +8,7 @@ import { useCursorEngine } from "@/audio/cursor/useCursorEngine";
 import { useJianpuCurve } from "@/audio/jianpu/useJianpuCurve";
 import { evaluatePractice, ApiError } from "@/lib/api";
 import type { PitchFrame } from "@/audio/pitch/types";
+import type { JianpuNote } from "@/audio/jianpu/types";
 import type { EvaluateResult } from "@/lib/api";
 
 // ── Constants ────────────────────────────────────────────────
@@ -61,6 +62,42 @@ function frequencyToNoteName(freq: number): { note: string; cents: number } {
   const octave = Math.floor(rounded / 12);
   const noteIndex = ((rounded % 12) + 12) % 12;
   return { note: `${SEMITONE_NAMES[noteIndex]}${octave}`, cents };
+}
+
+// ── Jianpu display helpers ────────────────────────────────────
+
+/** Convert a JianpuNote to its display character. */
+function jianpuToDisplayChar(note: JianpuNote): string {
+  if (note.degree === -1) return "\u2212"; // sustain → minus sign
+  if (note.degree === 0) return "0"; // rest
+  let ch = String(note.degree);
+  if (note.octaveShift > 0) ch += "\u0307"; // combining dot above
+  if (note.octaveShift < 0) ch += "\u0323"; // combining dot below
+  return ch;
+}
+
+/** Map parsed notes to display positions with bar/beat info. */
+function computeNotePositions(
+  notes: JianpuNote[],
+  beatsPerMeasure: number,
+): { char: string; bar: number; beat: number; totalBeatStart: number; totalBeatEnd: number }[] {
+  const positions: { char: string; bar: number; beat: number; totalBeatStart: number; totalBeatEnd: number }[] = [];
+  let totalBeats = 0;
+
+  for (const note of notes) {
+    const bar = 1 + Math.floor(totalBeats / beatsPerMeasure);
+    const beat = 1 + (totalBeats % beatsPerMeasure);
+    positions.push({
+      char: jianpuToDisplayChar(note),
+      bar,
+      beat,
+      totalBeatStart: totalBeats,
+      totalBeatEnd: totalBeats + note.beats,
+    });
+    totalBeats += note.beats;
+  }
+
+  return positions;
 }
 
 // ── Component ────────────────────────────────────────────────
@@ -518,11 +555,21 @@ export default function PracticePage() {
           </div>
         </div>
 
-        {/* Cursor position (scale/melody only) */}
+        {/* Jianpu strip + cursor position (scale/melody only) */}
         {exerciseType !== "long_tone" && (
-          <div style={styles.cursorInfo}>
-            Bar {cursor.position.currentBar}, Beat {cursor.position.currentBeat.toFixed(1)}
-          </div>
+          <>
+            {jianpuCurve.notes.length > 0 && (
+              <JianpuStrip
+                notes={jianpuCurve.notes}
+                currentBar={cursor.position.currentBar}
+                currentBeat={cursor.position.currentBeat}
+                beatsPerMeasure={4}
+              />
+            )}
+            <div style={styles.cursorInfo}>
+              Bar {cursor.position.currentBar}, Beat {cursor.position.currentBeat.toFixed(1)}
+            </div>
+          </>
         )}
 
         {/* Progress timer */}
@@ -641,6 +688,59 @@ function ScoreBar({ label, pct }: { label: string; pct: number }) {
       </div>
     </div>
   );
+}
+
+// ── Jianpu Strip ──────────────────────────────────────────────
+
+function JianpuStrip({
+  notes,
+  currentBar,
+  currentBeat,
+  beatsPerMeasure,
+}: {
+  notes: JianpuNote[];
+  currentBar: number;
+  currentBeat: number;
+  beatsPerMeasure: number;
+}) {
+  const positions = computeNotePositions(notes, beatsPerMeasure);
+  if (positions.length === 0) return null;
+
+  const cursorTotalBeats = (currentBar - 1) * beatsPerMeasure + (currentBeat - 1);
+  const activeIndex = positions.findIndex(
+    (p) => cursorTotalBeats >= p.totalBeatStart && cursorTotalBeats < p.totalBeatEnd,
+  );
+
+  const elements: React.ReactNode[] = [];
+  let lastBar = 0;
+
+  for (let i = 0; i < positions.length; i++) {
+    const p = positions[i];
+    if (p.bar !== lastBar && lastBar > 0) {
+      elements.push(
+        <span key={`bar-${lastBar}`} style={styles.jianpuBarLine}>|</span>,
+      );
+    }
+    lastBar = p.bar;
+
+    const isPast = activeIndex >= 0 && i < activeIndex;
+    const isActive = i === activeIndex;
+
+    elements.push(
+      <span
+        key={i}
+        style={{
+          ...styles.jianpuChar,
+          ...(isActive ? styles.jianpuCharActive : {}),
+          ...(isPast ? styles.jianpuCharPast : {}),
+        }}
+      >
+        {p.char}
+      </span>,
+    );
+  }
+
+  return <div style={styles.jianpuStrip}>{elements}</div>;
 }
 
 // ── Styles ────────────────────────────────────────────────────
@@ -852,6 +952,42 @@ const styles: Record<string, React.CSSProperties> = {
     backgroundColor: "#3b82f6",
     transform: "translateX(-5px)",
     transition: "left 0.1s ease-out",
+  },
+
+  // Jianpu strip
+  jianpuStrip: {
+    display: "flex",
+    flexDirection: "row" as const,
+    gap: 2,
+    overflowX: "auto" as const,
+    justifyContent: "center",
+    padding: 12,
+    border: "1px solid #e2e8f0",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    marginBottom: 12,
+  },
+  jianpuChar: {
+    fontSize: 20,
+    fontWeight: 600,
+    padding: "4px 6px",
+    borderRadius: 4,
+    color: "#1e293b",
+  },
+  jianpuCharActive: {
+    backgroundColor: "#dbeafe",
+    color: "#2563eb",
+  },
+  jianpuCharPast: {
+    color: "#94a3b8",
+  },
+  jianpuBarLine: {
+    color: "#cbd5e1",
+    margin: "0 4px",
+    fontSize: 20,
+    fontWeight: 400,
+    display: "flex",
+    alignItems: "center",
   },
 
   // Cursor info
