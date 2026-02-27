@@ -36,8 +36,12 @@ class Config:
     # ── AI / Vision ────────────────────────────────────────────
     ANTHROPIC_API_KEY: str = ""  # empty = vision OMR disabled
 
+    # ── Rate Limiting ──────────────────────────────────────────
+    RATE_LIMIT_REQUESTS: int = 60       # max requests per window
+    RATE_LIMIT_WINDOW_S: int = 60       # sliding window in seconds
+
     # ── App ──────────────────────────────────────────────────
-    APP_VERSION: str = "0.2.0"
+    APP_VERSION: str = "0.3.0"
     ENVIRONMENT: str = "development"  # development | staging | production
 
 

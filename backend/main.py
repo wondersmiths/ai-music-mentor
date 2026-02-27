@@ -19,7 +19,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from backend.config import settings  # noqa: E402
 from backend.logging_setup import setup_logging  # noqa: E402
-from backend.routers import analyze, health, practice, score  # noqa: E402
+from backend.middleware.rate_limit import RateLimitMiddleware  # noqa: E402
+from backend.routers import analyze, evaluate, health, practice, score, session  # noqa: E402
 
 # ── Logging ──────────────────────────────────────────────────
 
@@ -46,12 +47,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Rate Limiting ─────────────────────────────────────────────
+
+if settings.ENVIRONMENT == "production":
+    app.add_middleware(RateLimitMiddleware, max_requests=60, window_seconds=60)
+
 # ── Routers ──────────────────────────────────────────────────
 
 app.include_router(health.router)
 app.include_router(analyze.router)
+app.include_router(evaluate.router)
 app.include_router(score.router)
 app.include_router(practice.router)
+app.include_router(session.router)
 
 # ── Middleware: request logging ──────────────────────────────
 
@@ -86,6 +94,10 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 @app.on_event("startup")
 async def startup():
+    # Create database tables if they don't exist
+    from backend.models.database import create_tables
+    create_tables()
+
     logger.info(
         "Starting AI Music Mentor v%s [%s] on :%d",
         settings.APP_VERSION, settings.ENVIRONMENT, settings.PORT,

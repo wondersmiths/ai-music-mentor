@@ -222,3 +222,83 @@ export async function stopPractice(sessionId: string): Promise<StopResult> {
     body: JSON.stringify({ session_id: sessionId }),
   }, { timeout: 60000 });
 }
+
+// ── Evaluate practice session (F7 → API1) ─────────────────
+
+export interface EvaluateFrame {
+  time: number;
+  frequency: number;
+  confidence: number;
+}
+
+export interface ReferencePoint {
+  time: number;
+  frequency: number;
+}
+
+export interface UnstableRange {
+  start_time: number;
+  end_time: number;
+  mean_deviation_cents: number;
+}
+
+export interface StabilityDetail {
+  stability_score: number;
+  mean_deviation_cents: number;
+  variance_cents: number;
+  unstable_ranges: UnstableRange[];
+}
+
+export interface DTWDetail {
+  pitch_error_mean: number;
+  timing_deviation: number;
+  path_length: number;
+}
+
+export interface EvaluateResult {
+  overall_score: number;
+  pitch_score: number;
+  stability_score: number;
+  slide_score: number;
+  rhythm_score: number;
+  recommended_training_type: string;
+  textual_feedback: string;
+  stability_detail: StabilityDetail | null;
+  dtw_detail: DTWDetail | null;
+}
+
+export interface EvaluateRequest {
+  exercise_type: string;
+  frames: EvaluateFrame[];
+  duration: number;
+  target_frequency?: number;
+  reference_curve?: ReferencePoint[];
+  bpm?: number;
+}
+
+/**
+ * Evaluate a recorded practice session.
+ * Sends pitch frames from the session recorder (F6) to the backend
+ * evaluation pipeline (B1/B2/B5) and returns scores + feedback.
+ *
+ * Retries once on server error (5xx).
+ */
+export async function evaluatePractice(
+  req: EvaluateRequest,
+): Promise<EvaluateResult> {
+  const init: RequestInit = {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req),
+  };
+
+  try {
+    return await request<EvaluateResult>("/api/evaluate", init, { timeout: 10000 });
+  } catch (err) {
+    // Retry once on server errors (5xx)
+    if (err instanceof ApiError && err.status >= 500) {
+      return request<EvaluateResult>("/api/evaluate", init, { timeout: 10000 });
+    }
+    throw err;
+  }
+}
