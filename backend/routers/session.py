@@ -12,14 +12,16 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from backend.auth import get_optional_user
 from backend.models.database import get_db
 from backend.models.tables import (
     ExerciseResult,
+    PracticeStreak,
     SkillProgress,
     TrainingSession,
     User,
@@ -29,9 +31,12 @@ from ai.progression.engine import SkillSnapshot, recommend
 from backend.schemas.session import (
     EndSessionRequest,
     EndSessionResponse,
+    ExerciseResultResponse,
     ProgressResponse,
     RecommendationResponse,
     SaveResultRequest,
+    SessionHistoryResponse,
+    SessionHistoryItem,
     SkillProgressResponse,
     StartSessionRequest,
     StartSessionResponse,
@@ -145,6 +150,9 @@ def end_session(req: EndSessionRequest, db: Session = Depends(get_db)):
         if results:
             session.overall_score = sum(r.overall_score for r in results) / len(results)
 
+        # Update practice streak
+        _update_streak(db, session.user_id)
+
         db.commit()
 
         return EndSessionResponse(
@@ -224,6 +232,82 @@ def get_recommendation(username: str, db: Session = Depends(get_db)):
         message=rec.message,
         skill_summary=rec.skill_summary,
     )
+
+
+@router.get(
+    "/sessions/{username}/history",
+    response_model=SessionHistoryResponse,
+    responses={404: {"model": ErrorResponse}},
+)
+def get_session_history(username: str, limit: int = 20, db: Session = Depends(get_db)):
+    """Get recent session history with exercise results."""
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    sessions = (
+        db.query(TrainingSession)
+        .filter(TrainingSession.user_id == user.id)
+        .order_by(TrainingSession.started_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+    items = []
+    for s in sessions:
+        results = db.query(ExerciseResult).filter(ExerciseResult.session_id == s.id).all()
+        items.append(SessionHistoryItem(
+            session_id=s.session_id,
+            instrument=s.instrument,
+            started_at=s.started_at.isoformat() if s.started_at else "",
+            duration_s=s.duration_s or 0,
+            exercise_count=s.exercise_count or 0,
+            overall_score=s.overall_score,
+            exercises=[
+                ExerciseResultResponse(
+                    exercise_type=r.exercise_type,
+                    overall_score=r.overall_score,
+                    pitch_score=r.pitch_score,
+                    stability_score=r.stability_score,
+                    slide_score=r.slide_score,
+                    rhythm_score=r.rhythm_score,
+                    duration_s=r.duration_s,
+                )
+                for r in results
+            ],
+        ))
+
+    return SessionHistoryResponse(username=user.username, sessions=items)
+
+
+def _update_streak(db: Session, user_id: int):
+    """Update practice streak after a session ends."""
+    today = date.today()
+    streak = db.query(PracticeStreak).filter(PracticeStreak.user_id == user_id).first()
+
+    if not streak:
+        streak = PracticeStreak(
+            user_id=user_id,
+            current_streak=1,
+            longest_streak=1,
+            last_practice_date=today,
+        )
+        db.add(streak)
+        return
+
+    if streak.last_practice_date == today:
+        return  # Already practiced today
+
+    yesterday = today - timedelta(days=1)
+    if streak.last_practice_date == yesterday:
+        streak.current_streak += 1
+    else:
+        streak.current_streak = 1
+
+    if streak.current_streak > streak.longest_streak:
+        streak.longest_streak = streak.current_streak
+
+    streak.last_practice_date = today
 
 
 def _update_skill_progress(

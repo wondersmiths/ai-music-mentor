@@ -6,7 +6,9 @@ import { useSessionRecorder } from "@/audio/recorder/useSessionRecorder";
 import { useStabilityAnalyzer } from "@/audio/stability/useStabilityAnalyzer";
 import { useCursorEngine } from "@/audio/cursor/useCursorEngine";
 import { useJianpuCurve } from "@/audio/jianpu/useJianpuCurve";
-import { evaluatePractice, ApiError } from "@/lib/api";
+import { useMetronome } from "@/audio/metronome/useMetronome";
+import { evaluatePractice, listScores, ApiError } from "@/lib/api";
+import type { SavedScore } from "@/lib/api";
 import type { PitchFrame } from "@/audio/pitch/types";
 import type { JianpuNote } from "@/audio/jianpu/types";
 import type { EvaluateResult } from "@/lib/api";
@@ -122,6 +124,11 @@ export default function PracticePage() {
   // Results
   const [result, setResult] = useState<EvaluateResult | null>(null);
 
+  // Score library
+  const [libraryScores, setLibraryScores] = useState<SavedScore[]>([]);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+
   // Inject CSS keyframes
   useEffect(() => {
     const id = "practice-keyframes";
@@ -180,6 +187,12 @@ export default function PracticePage() {
     config: { bpm, tonic: "D" },
   });
 
+  const metronome = useMetronome({
+    bpm,
+    beatsPerMeasure: 4,
+    enabled: phase === "recording" && exerciseType !== "long_tone",
+  });
+
   // ── Callbacks ──────────────────────────────────────────────
 
   const phaseRef = useRef(phase);
@@ -197,6 +210,33 @@ export default function PracticePage() {
   );
 
   const pitchDetector = usePitchDetector({ onPitch: handlePitchFrame });
+
+  const handleBrowseLibrary = useCallback(async () => {
+    if (showLibrary) {
+      setShowLibrary(false);
+      return;
+    }
+    setLibraryLoading(true);
+    try {
+      const scores = await listScores();
+      setLibraryScores(scores);
+    } catch {
+      // ignore
+    }
+    setLibraryLoading(false);
+    setShowLibrary(true);
+  }, [showLibrary]);
+
+  const handleSelectLibraryScore = useCallback((score: SavedScore) => {
+    setCustomJianpu(score.jianpu_notation);
+    if (exerciseType === "melody") {
+      setMelodyPreset("Custom");
+    } else {
+      setExerciseType("melody");
+      setMelodyPreset("Custom");
+    }
+    setShowLibrary(false);
+  }, [exerciseType]);
 
   const handleStopRecording = useCallback(async () => {
     if (phaseRef.current !== "recording") return;
@@ -444,6 +484,38 @@ export default function PracticePage() {
           </div>
         )}
 
+        {/* Browse Library */}
+        <div style={{ marginBottom: 16 }}>
+          <button
+            style={styles.libraryBtn}
+            onClick={handleBrowseLibrary}
+            disabled={phase === "starting" || libraryLoading}
+          >
+            {libraryLoading ? "Loading..." : showLibrary ? "Hide Library" : "Browse Library"}
+          </button>
+        </div>
+
+        {showLibrary && libraryScores.length > 0 && (
+          <div style={styles.libraryPanel}>
+            {libraryScores.map((s) => (
+              <div key={s.id} style={styles.libraryCard}>
+                <div>
+                  <div style={styles.libraryTitle}>{s.title}</div>
+                  <div style={styles.libraryMeta}>
+                    {s.key_signature || "—"} {s.is_builtin ? "(built-in)" : ""}
+                  </div>
+                </div>
+                <button
+                  style={styles.librarySelectBtn}
+                  onClick={() => handleSelectLibraryScore(s)}
+                >
+                  Select
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Start button */}
         <button
           style={{
@@ -554,6 +626,27 @@ export default function PracticePage() {
             }} />
           </div>
         </div>
+
+        {/* Metronome beat pulse (scale/melody only) */}
+        {exerciseType !== "long_tone" && metronome.currentBeat > 0 && (
+          <div style={styles.beatPulseRow}>
+            {Array.from({ length: 4 }, (_, i) => (
+              <div
+                key={i}
+                style={{
+                  ...styles.beatDot,
+                  backgroundColor:
+                    metronome.currentBeat === i + 1
+                      ? metronome.isAccent
+                        ? "#3b82f6"
+                        : "#60a5fa"
+                      : "#e2e8f0",
+                  transform: metronome.currentBeat === i + 1 ? "scale(1.3)" : "scale(1)",
+                }}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Jianpu strip + cursor position (scale/melody only) */}
         {exerciseType !== "long_tone" && (
@@ -1174,5 +1267,73 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 14,
     fontWeight: 500,
     cursor: "pointer",
+  },
+
+  // Library
+  libraryBtn: {
+    padding: "8px 16px",
+    backgroundColor: "#f8fafc",
+    color: "#475569",
+    border: "1px solid #cbd5e1",
+    borderRadius: 6,
+    fontSize: 14,
+    fontWeight: 500,
+    cursor: "pointer",
+    width: "100%",
+  },
+  libraryPanel: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 8,
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: "#fafafa",
+    borderRadius: 8,
+    border: "1px solid #e2e8f0",
+    maxHeight: 240,
+    overflowY: "auto" as const,
+  },
+  libraryCard: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "8px 12px",
+    backgroundColor: "#fff",
+    borderRadius: 6,
+    border: "1px solid #e2e8f0",
+  },
+  libraryTitle: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: "#1e293b",
+  },
+  libraryMeta: {
+    fontSize: 12,
+    color: "#94a3b8",
+    marginTop: 2,
+  },
+  librarySelectBtn: {
+    padding: "4px 12px",
+    backgroundColor: "#3b82f6",
+    color: "#fff",
+    border: "none",
+    borderRadius: 4,
+    fontSize: 12,
+    fontWeight: 500,
+    cursor: "pointer",
+  },
+
+  // Beat pulse
+  beatPulseRow: {
+    display: "flex",
+    justifyContent: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+  beatDot: {
+    width: 16,
+    height: 16,
+    borderRadius: "50%",
+    transition: "all 0.1s ease",
   },
 };

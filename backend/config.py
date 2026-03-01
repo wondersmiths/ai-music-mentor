@@ -40,8 +40,11 @@ class Config:
     RATE_LIMIT_REQUESTS: int = 60       # max requests per window
     RATE_LIMIT_WINDOW_S: int = 60       # sliding window in seconds
 
+    # ── Auth ─────────────────────────────────────────────────
+    JWT_SECRET: str = "dev-secret-change-in-production"
+
     # ── App ──────────────────────────────────────────────────
-    APP_VERSION: str = "0.3.0"
+    APP_VERSION: str = "0.4.0"
     ENVIRONMENT: str = "development"  # development | staging | production
 
 

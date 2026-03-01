@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from backend.config import settings  # noqa: E402
 from backend.logging_setup import setup_logging  # noqa: E402
 from backend.middleware.rate_limit import RateLimitMiddleware  # noqa: E402
-from backend.routers import analyze, evaluate, health, practice, score, session  # noqa: E402
+from backend.routers import analyze, auth, evaluate, health, practice, score, scores_library, session, streaks, teacher  # noqa: E402
 
 # ── Logging ──────────────────────────────────────────────────
 
@@ -43,7 +43,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -55,11 +55,15 @@ if settings.ENVIRONMENT == "production":
 # ── Routers ──────────────────────────────────────────────────
 
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(analyze.router)
 app.include_router(evaluate.router)
 app.include_router(score.router)
 app.include_router(practice.router)
 app.include_router(session.router)
+app.include_router(scores_library.router)
+app.include_router(teacher.router)
+app.include_router(streaks.router)
 
 # ── Middleware: request logging ──────────────────────────────
 
@@ -97,6 +101,14 @@ async def startup():
     # Create database tables if they don't exist
     from backend.models.database import create_tables
     create_tables()
+
+    # Run ALTER TABLE migrations for existing databases
+    from backend.migrations import run_migrations
+    run_migrations()
+
+    # Seed built-in scores
+    from backend.seeds import seed_builtin_scores
+    seed_builtin_scores()
 
     logger.info(
         "Starting AI Music Mentor v%s [%s] on :%d",

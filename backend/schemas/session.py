@@ -68,3 +68,28 @@ class RecommendationResponse(BaseModel):
     difficulty: str
     message: str
     skill_summary: dict
+
+
+class ExerciseResultResponse(BaseModel):
+    exercise_type: str
+    overall_score: float
+    pitch_score: Optional[float] = None
+    stability_score: Optional[float] = None
+    slide_score: Optional[float] = None
+    rhythm_score: Optional[float] = None
+    duration_s: float
+
+
+class SessionHistoryItem(BaseModel):
+    session_id: str
+    instrument: str
+    started_at: str
+    duration_s: float
+    exercise_count: int
+    overall_score: Optional[float] = None
+    exercises: List[ExerciseResultResponse] = []
+
+
+class SessionHistoryResponse(BaseModel):
+    username: str
+    sessions: List[SessionHistoryItem]
