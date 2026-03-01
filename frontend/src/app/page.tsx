@@ -21,9 +21,9 @@ const FEATURES = [
   },
   {
     title: "Score Library",
-    href: "/practice",
+    href: "/scores",
     description:
-      "Browse built-in scores and upload your own sheet music from within the practice page.",
+      "Browse built-in exercises, manage your saved scores, and upload new sheet music.",
     icon: "\u{1F4DA}",
     authRequired: false,
   },

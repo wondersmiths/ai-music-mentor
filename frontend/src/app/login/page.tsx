@@ -36,9 +36,15 @@ export default function LoginPage() {
       }
       window.location.href = "/";
     } catch (err: unknown) {
-      const detail = err && typeof err === "object" && "detail" in err
-        ? (err as { detail: string }).detail
-        : "Something went wrong";
+      let detail = "Something went wrong";
+      if (err instanceof Error) {
+        detail = err.message === "Failed to fetch"
+          ? "Cannot reach the server — is the backend running?"
+          : err.message;
+      }
+      if (err && typeof err === "object" && "detail" in err) {
+        detail = (err as { detail: string }).detail;
+      }
       setError(detail);
     } finally {
       setLoading(false);
