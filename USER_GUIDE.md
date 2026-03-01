@@ -157,6 +157,17 @@ The Score Library page (`/scores`) displays all available scores in two sections
 
 Each score card shows the title, jianpu notation, key signature, and instrument.
 
+### Creating a New Score
+
+1. Log in and go to the **Score Library** page (`/scores`).
+2. Click the **+ New Score** button in the My Scores section.
+3. Fill in the form:
+   - **Title** (required) — a name for the score.
+   - **Jianpu Notation** (required) — the notation in jianpu format (see [Jianpu Notation Format](#jianpu-notation-format)).
+   - **Key Signature** (optional) — e.g. `1=D`.
+   - **Instrument** (optional) — e.g. `erhu`.
+4. Click **Save Score**. The new score appears immediately in your list.
+
 ### Using Scores in Practice
 
 1. Go to the **Practice** page.
