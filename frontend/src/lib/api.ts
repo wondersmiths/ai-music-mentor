@@ -8,7 +8,7 @@
  */
 
 function resolveApiUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+  const raw = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8001";
   // Ensure the URL has a protocol so fetch() doesn't treat it as a relative path
   if (raw && !raw.startsWith("http://") && !raw.startsWith("https://")) {
     return `https://${raw}`;
@@ -32,6 +32,12 @@ interface RequestOptions {
   timeout?: number; // ms, default 30000
 }
 
+function getAuthHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {};
+  const token = localStorage.getItem("auth_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function request<T>(
   path: string,
   init: RequestInit,
@@ -41,13 +47,24 @@ async function request<T>(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
 
+  // Merge auth headers
+  const authHeaders = getAuthHeaders();
+  const existingHeaders = (init.headers as Record<string, string>) || {};
+  const mergedInit: RequestInit = {
+    ...init,
+    headers: { ...authHeaders, ...existingHeaders },
+    signal: controller.signal,
+  };
+
   try {
-    const res = await fetch(`${API_URL}${path}`, {
-      ...init,
-      signal: controller.signal,
-    });
+    const res = await fetch(`${API_URL}${path}`, mergedInit);
 
     if (!res.ok) {
+      // Handle 401 by clearing stale token
+      if (res.status === 401 && typeof window !== "undefined") {
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("auth_username");
+      }
       const body = await res.json().catch(() => ({ detail: res.statusText }));
       throw new ApiError(res.status, body.detail || `HTTP ${res.status}`);
     }
@@ -255,6 +272,30 @@ export interface DTWDetail {
   path_length: number;
 }
 
+export interface SlideDetail {
+  slide_score: number;
+  slide_count: number;
+  segments: Array<{
+    start_time: number;
+    end_time: number;
+    start_freq: number;
+    end_freq: number;
+    interval_cents: number;
+    smoothness: number;
+    overshoot_cents: number;
+    has_step_artifact: boolean;
+  }>;
+}
+
+export interface RhythmDetail {
+  rhythm_score: number;
+  mean_deviation_ms: number;
+  max_deviation_ms: number;
+  tempo_drift: number;
+  onset_count: number;
+  expected_onset_count: number;
+}
+
 export interface EvaluateResult {
   overall_score: number;
   pitch_score: number;
@@ -265,6 +306,8 @@ export interface EvaluateResult {
   textual_feedback: string;
   stability_detail: StabilityDetail | null;
   dtw_detail: DTWDetail | null;
+  slide_detail: SlideDetail | null;
+  rhythm_detail: RhythmDetail | null;
 }
 
 export interface EvaluateRequest {
@@ -301,4 +344,215 @@ export async function evaluatePractice(
     }
     throw err;
   }
+}
+
+// ── Auth API ────────────────────────────────────────────────
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+  username: string;
+  user_id: number;
+}
+
+export interface UserInfo {
+  id: number;
+  username: string;
+  display_name: string | null;
+  role: string;
+  instrument: string;
+}
+
+export async function register(data: {
+  username: string;
+  password: string;
+  display_name?: string;
+  role?: string;
+}): Promise<TokenResponse> {
+  return request<TokenResponse>("/api/auth/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function login(data: {
+  username: string;
+  password: string;
+}): Promise<TokenResponse> {
+  return request<TokenResponse>("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getMe(): Promise<UserInfo> {
+  return request<UserInfo>("/api/auth/me", { method: "GET" });
+}
+
+// ── Progress & Session History API ──────────────────────────
+
+export interface SkillProgressData {
+  skill_area: string;
+  score: number;
+  exercise_count: number;
+}
+
+export interface ProgressData {
+  username: string;
+  instrument: string;
+  total_sessions: number;
+  skills: SkillProgressData[];
+}
+
+export interface RecommendationData {
+  recommended_exercise: string;
+  focus_areas: string[];
+  difficulty: string;
+  message: string;
+  skill_summary: Record<string, number>;
+}
+
+export interface ExerciseResultData {
+  exercise_type: string;
+  overall_score: number;
+  pitch_score: number | null;
+  stability_score: number | null;
+  slide_score: number | null;
+  rhythm_score: number | null;
+  duration_s: number;
+}
+
+export interface SessionHistoryItem {
+  session_id: string;
+  instrument: string;
+  started_at: string;
+  duration_s: number;
+  exercise_count: number;
+  overall_score: number | null;
+  exercises: ExerciseResultData[];
+}
+
+export interface SessionHistoryData {
+  username: string;
+  sessions: SessionHistoryItem[];
+}
+
+export async function getProgress(username: string): Promise<ProgressData> {
+  return request<ProgressData>(`/api/progress/${encodeURIComponent(username)}`, { method: "GET" });
+}
+
+export async function getRecommendation(username: string): Promise<RecommendationData> {
+  return request<RecommendationData>(`/api/progress/${encodeURIComponent(username)}/recommend`, { method: "GET" });
+}
+
+export async function getSessionHistory(username: string): Promise<SessionHistoryData> {
+  return request<SessionHistoryData>(`/api/sessions/${encodeURIComponent(username)}/history`, { method: "GET" });
+}
+
+// ── Score Library API ───────────────────────────────────────
+
+export interface SavedScore {
+  id: number;
+  title: string;
+  jianpu_notation: string;
+  key_signature: string | null;
+  instrument: string | null;
+  is_builtin: boolean;
+  user_id: number | null;
+}
+
+export async function listScores(): Promise<SavedScore[]> {
+  return request<SavedScore[]>("/api/scores", { method: "GET" });
+}
+
+export async function saveScore(data: {
+  title: string;
+  jianpu_notation: string;
+  key_signature?: string;
+  instrument?: string;
+}): Promise<SavedScore> {
+  return request<SavedScore>("/api/scores", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteScore(id: number): Promise<{ status: string }> {
+  return request<{ status: string }>(`/api/scores/${id}`, { method: "DELETE" });
+}
+
+// ── Streaks & Goals API ─────────────────────────────────────
+
+export interface StreakData {
+  current_streak: number;
+  longest_streak: number;
+  last_practice_date: string | null;
+}
+
+export interface WeeklyGoalData {
+  target_sessions: number;
+  target_minutes: number;
+  completed_sessions: number;
+  completed_minutes: number;
+  week_start: string;
+}
+
+export async function getStreak(username: string): Promise<StreakData> {
+  return request<StreakData>(`/api/streaks/${encodeURIComponent(username)}`, { method: "GET" });
+}
+
+export async function setWeeklyGoal(data: {
+  target_sessions: number;
+  target_minutes: number;
+}): Promise<WeeklyGoalData> {
+  return request<WeeklyGoalData>("/api/goals", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function getWeeklyGoal(username: string): Promise<WeeklyGoalData> {
+  return request<WeeklyGoalData>(`/api/goals/${encodeURIComponent(username)}`, { method: "GET" });
+}
+
+// ── Teacher/Assignment API ──────────────────────────────────
+
+export interface AssignmentData {
+  id: number;
+  teacher_id: number;
+  student_id: number;
+  score_id: number | null;
+  title: string;
+  notes: string | null;
+  due_date: string | null;
+  status: string;
+  created_at: string;
+  student_username?: string;
+  teacher_username?: string;
+}
+
+export async function createAssignment(data: {
+  student_username: string;
+  score_id?: number;
+  title: string;
+  notes?: string;
+  due_date?: string;
+}): Promise<AssignmentData> {
+  return request<AssignmentData>("/api/assignments", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function listAssignments(): Promise<AssignmentData[]> {
+  return request<AssignmentData[]>("/api/assignments", { method: "GET" });
+}
+
+export async function getStudentProgress(studentId: number): Promise<ProgressData> {
+  return request<ProgressData>(`/api/students/${studentId}/progress`, { method: "GET" });
 }

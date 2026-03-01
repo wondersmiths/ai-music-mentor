@@ -13,6 +13,9 @@ from backend.schemas.evaluation import (
     DTWDetail,
     EvaluateRequest,
     EvaluateResponse,
+    RhythmDetail,
+    SlideDetail,
+    SlideSegmentResponse,
     StabilityDetail,
     UnstableSegmentResponse,
 )
@@ -93,6 +96,39 @@ async def evaluate_practice(req: EvaluateRequest):
                 path_length=len(dr.alignment_path),
             )
 
+        slide_detail = None
+        if result.slide_result:
+            sr2 = result.slide_result
+            slide_detail = SlideDetail(
+                slide_score=sr2.slide_score,
+                slide_count=sr2.slide_count,
+                segments=[
+                    SlideSegmentResponse(
+                        start_time=seg.start_time,
+                        end_time=seg.end_time,
+                        start_freq=seg.start_freq,
+                        end_freq=seg.end_freq,
+                        interval_cents=seg.interval_cents,
+                        smoothness=seg.smoothness,
+                        overshoot_cents=seg.overshoot_cents,
+                        has_step_artifact=seg.has_step_artifact,
+                    )
+                    for seg in sr2.segments
+                ],
+            )
+
+        rhythm_detail = None
+        if result.rhythm_result:
+            rr = result.rhythm_result
+            rhythm_detail = RhythmDetail(
+                rhythm_score=rr.rhythm_score,
+                mean_deviation_ms=rr.mean_deviation_ms,
+                max_deviation_ms=rr.max_deviation_ms,
+                tempo_drift=rr.tempo_drift,
+                onset_count=rr.onset_count,
+                expected_onset_count=rr.expected_onset_count,
+            )
+
         return EvaluateResponse(
             overall_score=result.overall_score,
             pitch_score=result.pitch_score,
@@ -103,6 +139,8 @@ async def evaluate_practice(req: EvaluateRequest):
             textual_feedback=result.textual_feedback,
             stability_detail=stability_detail,
             dtw_detail=dtw_detail,
+            slide_detail=slide_detail,
+            rhythm_detail=rhythm_detail,
         )
 
     except Exception:

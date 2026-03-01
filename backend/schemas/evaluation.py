@@ -54,6 +54,32 @@ class DTWDetail(BaseModel):
     path_length: int
 
 
+class SlideSegmentResponse(BaseModel):
+    start_time: float
+    end_time: float
+    start_freq: float
+    end_freq: float
+    interval_cents: float
+    smoothness: float
+    overshoot_cents: float
+    has_step_artifact: bool
+
+
+class SlideDetail(BaseModel):
+    slide_score: float
+    slide_count: int
+    segments: List[SlideSegmentResponse] = []
+
+
+class RhythmDetail(BaseModel):
+    rhythm_score: float
+    mean_deviation_ms: float
+    max_deviation_ms: float
+    tempo_drift: float
+    onset_count: int
+    expected_onset_count: int
+
+
 class EvaluateResponse(BaseModel):
     overall_score: float = Field(..., ge=0, le=100)
     pitch_score: float = Field(..., ge=0, le=100)
@@ -64,3 +90,5 @@ class EvaluateResponse(BaseModel):
     textual_feedback: str
     stability_detail: Optional[StabilityDetail] = None
     dtw_detail: Optional[DTWDetail] = None
+    slide_detail: Optional[SlideDetail] = None
+    rhythm_detail: Optional[RhythmDetail] = None

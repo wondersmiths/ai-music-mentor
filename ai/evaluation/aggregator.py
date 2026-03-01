@@ -11,6 +11,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from ai.evaluation.dtw import DTWResult, dtw_align
+from ai.evaluation.onset_from_pitch import detect_onsets_from_pitch
+from ai.evaluation.rhythm import RhythmResult, analyze_rhythm
+from ai.evaluation.slide import SlideResult, analyze_slides
 from ai.evaluation.stability import StabilityResult, analyze_stability
 
 
@@ -20,12 +23,14 @@ class EvaluationResult:
     overall_score: float          # 0–100
     pitch_score: float            # 0–100 (from DTW pitch error)
     stability_score: float        # 0–100 (from stability analyzer)
-    slide_score: float            # 0–100 (placeholder for B3)
-    rhythm_score: float           # 0–100 (placeholder for B4)
+    slide_score: float            # 0–100 (from slide quality analyzer)
+    rhythm_score: float           # 0–100 (from rhythm consistency analyzer)
     recommended_training_type: str
     textual_feedback: str
     dtw_result: DTWResult | None = None
     stability_result: StabilityResult | None = None
+    slide_result: SlideResult | None = None
+    rhythm_result: RhythmResult | None = None
 
 
 # ── Score weights by exercise type ──────────────────────────
@@ -180,8 +185,21 @@ def evaluate(
             stability_result = analyze_stability(played_frames, median_freq)
             stab_score = stability_result.stability_score
 
-    # ── Slide score (placeholder for B3) ─────────────────────
-    slide_score = 100.0  # TODO: integrate slide quality analyzer when available
+    # ── Slide score ──────────────────────────────────────────
+    slide_result = analyze_slides(played_frames)
+    slide_score = slide_result.slide_score
+
+    # ── Rhythm score ──────────────────────────────────────────
+    rhythm_result: RhythmResult | None = None
+    if reference_curve and bpm and bpm > 0:
+        onset_times = detect_onsets_from_pitch(played_frames)
+        duration = played_frames[-1][0] if played_frames else 0.0
+        rhythm_result = analyze_rhythm(
+            onset_times=onset_times,
+            bpm=bpm,
+            duration=duration,
+        )
+        rhythm_score = rhythm_result.rhythm_score
 
     # ── Weighted overall score ───────────────────────────────
     w = WEIGHTS.get(exercise_type, DEFAULT_WEIGHTS)
@@ -206,4 +224,6 @@ def evaluate(
         textual_feedback=feedback,
         dtw_result=dtw_result,
         stability_result=stability_result,
+        slide_result=slide_result,
+        rhythm_result=rhythm_result,
     )
