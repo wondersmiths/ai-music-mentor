@@ -8,7 +8,7 @@
  */
 
 function resolveApiUrl(): string {
-  const raw = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8001";
+  const raw = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8001";
   // Ensure the URL has a protocol so fetch() doesn't treat it as a relative path
   if (raw && !raw.startsWith("http://") && !raw.startsWith("https://")) {
     return `https://${raw}`;
