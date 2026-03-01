@@ -35,6 +35,8 @@ def run_migrations():
     migrations = [
         ("users", "password_hash", "VARCHAR(255)"),
         ("users", "role", "VARCHAR(20) DEFAULT 'student'"),
+        ("users", "failed_login_attempts", "INTEGER DEFAULT 0 NOT NULL"),
+        ("users", "locked_until", "DATETIME"),
     ]
 
     with engine.begin() as conn:

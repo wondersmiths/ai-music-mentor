@@ -41,6 +41,8 @@ class User(Base):
     instrument = Column(String(50), nullable=False, default="erhu")
     created_at = Column(DateTime, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    failed_login_attempts = Column(Integer, default=0, server_default="0", nullable=False)
+    locked_until = Column(DateTime, nullable=True)
 
     sessions = relationship("TrainingSession", back_populates="user")
     progress = relationship("SkillProgress", back_populates="user")

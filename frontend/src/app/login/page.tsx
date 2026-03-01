@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { register, login } from "@/lib/api";
+import { register, login, ApiError } from "@/lib/api";
 
 type Mode = "login" | "register";
 
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState("student");
   const [error, setError] = useState("");
+  const [isRateLimited, setIsRateLimited] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,14 +38,16 @@ export default function LoginPage() {
       window.location.href = "/";
     } catch (err: unknown) {
       let detail = "Something went wrong";
-      if (err instanceof Error) {
+      let rateLimited = false;
+      if (err instanceof ApiError) {
+        detail = err.detail;
+        rateLimited = err.status === 429;
+      } else if (err instanceof Error) {
         detail = err.message === "Failed to fetch"
           ? "Cannot reach the server — is the backend running?"
           : err.message;
       }
-      if (err && typeof err === "object" && "detail" in err) {
-        detail = (err as { detail: string }).detail;
-      }
+      setIsRateLimited(rateLimited);
       setError(detail);
     } finally {
       setLoading(false);
@@ -78,7 +81,11 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && (
+          <div style={isRateLimited ? styles.warning : styles.error}>
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <label style={styles.label}>
@@ -205,6 +212,15 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 6,
     marginBottom: 16,
     fontSize: 14,
+  },
+  warning: {
+    padding: "8px 12px",
+    backgroundColor: "#fffbeb",
+    color: "#b45309",
+    borderRadius: 6,
+    marginBottom: 16,
+    fontSize: 14,
+    border: "1px solid #fcd34d",
   },
   form: {
     display: "flex",
