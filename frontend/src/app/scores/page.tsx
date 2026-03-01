@@ -1,13 +1,19 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { listScores, deleteScore, type SavedScore } from "@/lib/api";
+import { listScores, deleteScore, saveScore, type SavedScore } from "@/lib/api";
 
 export default function ScoresPage() {
   const [scores, setScores] = useState<SavedScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [authUser, setAuthUser] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newNotation, setNewNotation] = useState("");
+  const [newKey, setNewKey] = useState("");
+  const [newInstrument, setNewInstrument] = useState("");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -42,6 +48,30 @@ export default function ScoresPage() {
     },
     [],
   );
+
+  const handleCreate = useCallback(async () => {
+    if (!newTitle.trim() || !newNotation.trim()) return;
+    setCreating(true);
+    setError("");
+    try {
+      const created = await saveScore({
+        title: newTitle.trim(),
+        jianpu_notation: newNotation.trim(),
+        key_signature: newKey.trim() || undefined,
+        instrument: newInstrument.trim() || undefined,
+      });
+      setScores((prev) => [...prev, created]);
+      setNewTitle("");
+      setNewNotation("");
+      setNewKey("");
+      setNewInstrument("");
+      setShowCreate(false);
+    } catch {
+      setError("Failed to save score");
+    } finally {
+      setCreating(false);
+    }
+  }, [newTitle, newNotation, newKey, newInstrument]);
 
   const builtinScores = scores.filter((s) => s.is_builtin);
   const userScores = scores.filter((s) => !s.is_builtin);
@@ -82,19 +112,84 @@ export default function ScoresPage() {
 
           {/* User scores */}
           <section style={styles.section}>
-            <h2 style={styles.sectionTitle}>
-              My Scores ({userScores.length})
-            </h2>
+            <div style={styles.sectionHeader}>
+              <h2 style={styles.sectionTitle}>
+                My Scores ({userScores.length})
+              </h2>
+              {authUser && (
+                <button
+                  style={styles.newBtn}
+                  onClick={() => setShowCreate((v) => !v)}
+                >
+                  {showCreate ? "Cancel" : "+ New Score"}
+                </button>
+              )}
+            </div>
+
+            {authUser && showCreate && (
+              <div style={styles.createForm}>
+                <label style={styles.formLabel}>
+                  Title *
+                  <input
+                    style={styles.formInput}
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                    placeholder="e.g. My Practice Melody"
+                  />
+                </label>
+                <label style={styles.formLabel}>
+                  Jianpu Notation *
+                  <textarea
+                    style={styles.formTextarea}
+                    value={newNotation}
+                    onChange={(e) => setNewNotation(e.target.value)}
+                    placeholder="e.g. 1 1 5 5 | 6 6 5 - | 4 4 3 3 | 2 2 1 -"
+                    rows={3}
+                  />
+                </label>
+                <div style={styles.formRow}>
+                  <label style={styles.formLabel}>
+                    Key Signature
+                    <input
+                      style={styles.formInput}
+                      value={newKey}
+                      onChange={(e) => setNewKey(e.target.value)}
+                      placeholder="e.g. 1=D"
+                    />
+                  </label>
+                  <label style={styles.formLabel}>
+                    Instrument
+                    <input
+                      style={styles.formInput}
+                      value={newInstrument}
+                      onChange={(e) => setNewInstrument(e.target.value)}
+                      placeholder="e.g. erhu"
+                    />
+                  </label>
+                </div>
+                <button
+                  style={{
+                    ...styles.saveBtn,
+                    ...(creating || !newTitle.trim() || !newNotation.trim()
+                      ? styles.saveBtnDisabled
+                      : {}),
+                  }}
+                  disabled={creating || !newTitle.trim() || !newNotation.trim()}
+                  onClick={handleCreate}
+                >
+                  {creating ? "Saving..." : "Save Score"}
+                </button>
+              </div>
+            )}
+
             {!authUser ? (
               <p style={styles.empty}>
                 <a href="/login" style={styles.link}>Log in</a> to save and
                 manage your own scores.
               </p>
-            ) : userScores.length === 0 ? (
+            ) : userScores.length === 0 && !showCreate ? (
               <p style={styles.empty}>
-                No saved scores yet. Upload a score from the{" "}
-                <a href="/practice" style={styles.link}>Practice</a> page to
-                get started.
+                No saved scores yet. Click &quot;+ New Score&quot; to create one.
               </p>
             ) : (
               <div style={styles.grid}>
@@ -179,11 +274,81 @@ const styles: Record<string, React.CSSProperties> = {
   },
   loading: { fontSize: 14, color: "#64748b" },
   section: { marginBottom: 32 },
+  sectionHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: 600,
     color: "#1e293b",
-    margin: "0 0 12px 0",
+    margin: 0,
+  },
+  newBtn: {
+    padding: "6px 14px",
+    backgroundColor: "#3b82f6",
+    color: "#fff",
+    border: "none",
+    borderRadius: 6,
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
+  createForm: {
+    padding: 16,
+    border: "1px solid #e2e8f0",
+    borderRadius: 10,
+    backgroundColor: "#f8fafc",
+    marginBottom: 12,
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 12,
+  },
+  formLabel: {
+    display: "flex",
+    flexDirection: "column" as const,
+    gap: 4,
+    fontSize: 13,
+    fontWeight: 500,
+    color: "#475569",
+    flex: 1,
+  },
+  formInput: {
+    padding: "8px 10px",
+    border: "1px solid #cbd5e1",
+    borderRadius: 6,
+    fontSize: 14,
+    outline: "none",
+  },
+  formTextarea: {
+    padding: "8px 10px",
+    border: "1px solid #cbd5e1",
+    borderRadius: 6,
+    fontSize: 14,
+    outline: "none",
+    resize: "vertical" as const,
+    fontFamily: "monospace",
+  },
+  formRow: {
+    display: "flex",
+    gap: 12,
+  },
+  saveBtn: {
+    padding: "8px 16px",
+    backgroundColor: "#22c55e",
+    color: "#fff",
+    border: "none",
+    borderRadius: 6,
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+    alignSelf: "flex-start" as const,
+  },
+  saveBtnDisabled: {
+    opacity: 0.5,
+    cursor: "not-allowed",
   },
   empty: { fontSize: 14, color: "#94a3b8" },
   link: { color: "#3b82f6", textDecoration: "none", fontWeight: 500 },
