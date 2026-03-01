@@ -7,36 +7,40 @@ const FEATURES = [
     title: "Practice",
     href: "/practice",
     description:
-      "Record exercises with real-time pitch detection, guided metronome, and instant AI evaluation.",
+      "Record exercises with real-time pitch detection, guided metronome, and instant AI evaluation. No account needed.",
     icon: "\u{1F3B5}",
+    authRequired: false,
   },
   {
     title: "Dashboard",
     href: "/dashboard",
     description:
-      "Track your skill progress, view session history, manage streaks, and set weekly goals.",
+      "Track your skill progress, view session history, manage streaks, and set weekly goals. Requires login.",
     icon: "\u{1F4CA}",
+    authRequired: true,
   },
   {
     title: "Score Library",
     href: "/practice",
     description:
-      "Browse built-in scores, upload your own sheet music, and save favourites for later.",
+      "Browse built-in scores and upload your own sheet music from within the practice page.",
     icon: "\u{1F4DA}",
+    authRequired: false,
   },
   {
     title: "Teacher",
     href: "/teacher",
     description:
-      "Create assignments, monitor student progress, and manage your studio.",
+      "Create assignments, monitor student progress, and manage your studio. Requires login.",
     icon: "\u{1F393}",
+    authRequired: true,
   },
 ];
 
 const STEPS = [
-  { num: 1, text: "Register an account or log in" },
-  { num: 2, text: "Pick an exercise — long tone, scale, or melody" },
-  { num: 3, text: "Play along and get instant AI feedback" },
+  { num: 1, text: "Choose an exercise — long tone, scale, or melody" },
+  { num: 2, text: "Hit record and play along with the metronome" },
+  { num: 3, text: "Get instant AI feedback on pitch and rhythm" },
 ];
 
 const INSTRUMENTS = [
@@ -100,7 +104,11 @@ export default function Home() {
       {/* Feature cards */}
       <section style={styles.grid}>
         {FEATURES.map((f) => (
-          <a key={f.title} href={f.href} style={styles.card}>
+          <a
+            key={f.title}
+            href={f.authRequired && !authUser ? "/login" : f.href}
+            style={styles.card}
+          >
             <span style={styles.cardIcon}>{f.icon}</span>
             <h3 style={styles.cardTitle}>{f.title}</h3>
             <p style={styles.cardDesc}>{f.description}</p>
