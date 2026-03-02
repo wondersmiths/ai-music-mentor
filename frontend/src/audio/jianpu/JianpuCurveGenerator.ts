@@ -91,53 +91,54 @@ export function parseJianpu(
   return { notes, measureCount };
 }
 
-function parseGroup(group: string, notes: JianpuNote[]): void {
-  // Pure sustain dashes
-  if (/^-+$/.test(group)) {
-    for (const _ of group) {
-      notes.push({ degree: 0, octaveShift: 0, beats: 1 }); // sustain marker
-      // Mark as sustain by setting degree = -1
-      notes[notes.length - 1].degree = -1;
+/**
+ * Try to parse a digit (0-7) with optional octave-shift markers starting at
+ * `startIndex` in `group`. Returns the parsed note and the index after the
+ * consumed characters, or `null` if no digit is found at `startIndex`.
+ */
+function tryParseDigitWithOctave(
+  group: string,
+  startIndex: number,
+): { digit: number; octaveShift: number; nextIndex: number } | null {
+  if (startIndex >= group.length) return null;
+  const ch = group[startIndex];
+  if (ch < "0" || ch > "7") return null;
+
+  const digit = parseInt(ch, 10);
+  let octaveShift = 0;
+
+  let j = startIndex + 1;
+  while (j < group.length) {
+    if (group[j] === "\u0307" || group[j] === "̇") {
+      octaveShift++;
+      j++;
+    } else if (group[j] === "\u0323" || group[j] === "̣") {
+      octaveShift--;
+      j++;
+    } else if (group[j] === "'" || group[j] === "\u02D9") {
+      octaveShift++;
+      j++;
+    } else if (group[j] === "," || group[j] === ".") {
+      octaveShift--;
+      j++;
+    } else {
+      break;
     }
-    return;
   }
 
-  // Extract digits (0-7) and count for duration inference
+  return { digit, octaveShift, nextIndex: j };
+}
+
+/** Parse a group that contains no parentheses (original flat logic). */
+function parseGroupFlat(group: string, notes: JianpuNote[]): void {
   const chars: { digit: number; octaveShift: number }[] = [];
   let i = 0;
   while (i < group.length) {
-    const ch = group[i];
-
-    if (ch >= "0" && ch <= "7") {
-      const digit = parseInt(ch, 10);
-      let octaveShift = 0;
-
-      // Check for combining dots after digit (Unicode 0307 = above, 0323 = below)
-      let j = i + 1;
-      while (j < group.length) {
-        if (group[j] === "\u0307" || group[j] === "̇") {
-          octaveShift++;
-          j++;
-        } else if (group[j] === "\u0323" || group[j] === "̣") {
-          octaveShift--;
-          j++;
-        } else if (group[j] === "'" || group[j] === "\u02D9") {
-          // ASCII-friendly octave up marker
-          octaveShift++;
-          j++;
-        } else if (group[j] === "," || group[j] === ".") {
-          // ASCII-friendly octave down marker (dot below)
-          octaveShift--;
-          j++;
-        } else {
-          break;
-        }
-      }
-
-      chars.push({ digit, octaveShift });
-      i = j;
-    } else if (ch === "-") {
-      // Dash within a group = sustain
+    const parsed = tryParseDigitWithOctave(group, i);
+    if (parsed) {
+      chars.push({ digit: parsed.digit, octaveShift: parsed.octaveShift });
+      i = parsed.nextIndex;
+    } else if (group[i] === "-") {
       notes.push({ degree: -1, octaveShift: 0, beats: 1 });
       i++;
     } else {
@@ -147,24 +148,112 @@ function parseGroup(group: string, notes: JianpuNote[]): void {
 
   if (chars.length === 0) return;
 
-  // Determine beats per note from group size
   let beatsPerNote: number;
   if (chars.length === 1) {
-    beatsPerNote = 1; // quarter note
+    beatsPerNote = 1;
   } else if (chars.length === 2) {
-    beatsPerNote = 0.5; // eighth notes
+    beatsPerNote = 0.5;
   } else if (chars.length === 3) {
-    beatsPerNote = 1 / 3; // triplets
+    beatsPerNote = 1 / 3;
   } else {
-    beatsPerNote = 0.25; // sixteenth notes
+    beatsPerNote = 0.25;
   }
 
   for (const { digit, octaveShift } of chars) {
-    notes.push({
-      degree: digit, // 0 = rest, 1-7 = note
-      octaveShift,
-      beats: beatsPerNote,
-    });
+    notes.push({ degree: digit, octaveShift, beats: beatsPerNote });
+  }
+}
+
+type GroupElement = {
+  kind: "bare" | "subgroup";
+  notes: { digit: number; octaveShift: number }[];
+};
+
+/**
+ * Tokenize a group string containing parentheses into top-level elements.
+ * Bare digits become `{ kind: "bare", notes: [note] }`, content in `(...)`
+ * becomes `{ kind: "subgroup", notes: [...] }`.
+ */
+function tokenizeGroupElements(group: string): GroupElement[] {
+  const elements: GroupElement[] = [];
+  let i = 0;
+
+  while (i < group.length) {
+    if (group[i] === "(") {
+      // Collect notes inside parentheses
+      i++; // skip '('
+      const subNotes: { digit: number; octaveShift: number }[] = [];
+      while (i < group.length && group[i] !== ")") {
+        const parsed = tryParseDigitWithOctave(group, i);
+        if (parsed) {
+          subNotes.push({ digit: parsed.digit, octaveShift: parsed.octaveShift });
+          i = parsed.nextIndex;
+        } else {
+          i++;
+        }
+      }
+      if (i < group.length) i++; // skip ')'
+      if (subNotes.length > 0) {
+        elements.push({ kind: "subgroup", notes: subNotes });
+      }
+    } else {
+      const parsed = tryParseDigitWithOctave(group, i);
+      if (parsed) {
+        elements.push({
+          kind: "bare",
+          notes: [{ digit: parsed.digit, octaveShift: parsed.octaveShift }],
+        });
+        i = parsed.nextIndex;
+      } else if (group[i] === "-") {
+        // Bare dash at top level — treat as sustain with proportional beat
+        elements.push({
+          kind: "bare",
+          notes: [{ digit: -1, octaveShift: 0 }],
+        });
+        i++;
+      } else {
+        i++;
+      }
+    }
+  }
+
+  return elements;
+}
+
+function parseGroup(group: string, notes: JianpuNote[]): void {
+  // Pure sustain dashes
+  if (/^-+$/.test(group)) {
+    for (const _ of group) {
+      notes.push({ degree: 0, octaveShift: 0, beats: 1 });
+      notes[notes.length - 1].degree = -1;
+    }
+    return;
+  }
+
+  // No parentheses → use original flat logic (backward compatible)
+  if (!group.includes("(")) {
+    parseGroupFlat(group, notes);
+    return;
+  }
+
+  // Mixed subdivision: tokenize into top-level elements
+  const elements = tokenizeGroupElements(group);
+  if (elements.length === 0) return;
+
+  const topN = elements.length;
+  const beatsPerElement = 1 / topN;
+
+  for (const elem of elements) {
+    if (elem.kind === "bare") {
+      const { digit, octaveShift } = elem.notes[0];
+      notes.push({ degree: digit, octaveShift, beats: beatsPerElement });
+    } else {
+      // subgroup: each note gets an equal share of this element's beat allocation
+      const subBeats = beatsPerElement / elem.notes.length;
+      for (const { digit, octaveShift } of elem.notes) {
+        notes.push({ degree: digit, octaveShift, beats: subBeats });
+      }
+    }
   }
 }
 

@@ -146,6 +146,24 @@ Jianpu (numbered musical notation) is used throughout the app:
 
 **Example:** `1 1 5 5 | 6 6 5 - | 4 4 3 3 | 2 2 1 -` = Twinkle Twinkle Little Star
 
+### Mixed Subdivisions
+
+Use parentheses to create sub-groups within a beat for mixed rhythmic patterns. The beat divides equally among top-level elements (bare digits and parenthesized groups), then notes inside a sub-group further divide their share equally.
+
+| Notation | Rhythm | Beats |
+|----------|--------|-------|
+| `1(23)` | eighth + two sixteenths | 0.5 + 0.25 + 0.25 |
+| `(12)3` | two sixteenths + eighth | 0.25 + 0.25 + 0.5 |
+| `1(234)` | eighth + three sub-notes | 0.5 + 0.167 + 0.167 + 0.167 |
+| `(12)(34)` | four sixteenths | 0.25 + 0.25 + 0.25 + 0.25 |
+
+**Examples:**
+
+- `1 1(23) 4 -` — quarter, then an eighth+two sixteenths, then quarter, then hold
+- `(12)3 (45)6` — two groups each with a sixteenth pair followed by an eighth
+
+Groups without parentheses behave exactly as before (e.g. `12` = two eighth notes).
+
 ---
 
 ## Score Library

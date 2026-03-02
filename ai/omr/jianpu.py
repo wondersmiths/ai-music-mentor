@@ -45,6 +45,7 @@ class JianpuToken:
     octave_shift: int = 0  # +1 = dot above, -1 = dot below
     dotted: bool = False  # rhythmic dot (1.5x duration)
     underlines: int = 0  # 0=quarter, 1=eighth, 2=sixteenth
+    duration_beats: float = 0.0  # if > 0, overrides underlines-based duration
 
 
 @dataclass
@@ -135,7 +136,8 @@ def extract_jianpu_text(binary: np.ndarray) -> str:
 def _clean_ocr_text(text: str) -> str:
     """Remove non-musical noise from OCR output."""
     # Remove rehearsal / measure numbers in parentheses: (60), (70), (90)
-    text = re.sub(r"\(\d+\)", "", text)
+    # Only strip 2+ digit numbers to preserve single-digit sub-groups like (23)
+    text = re.sub(r"\(\d{2,}\)", "", text)
     # Remove dynamic markings
     text = re.sub(r"\b(pp|p|mp|mf|f|ff|sfz|cresc|dim|rit)\b", " ", text, flags=re.IGNORECASE)
     # Remove Chinese characters (performance directions like 拉奏, 拨奏, 渐强)
@@ -222,27 +224,8 @@ def _parse_line(line: str, tokens: list) -> None:
             _parse_group(group, tokens)
 
 
-def _parse_group(group: str, tokens: list) -> None:
-    """Parse a space-separated group into tokens.
-
-    A group like "3235" = 4 beamed notes (sixteenths).
-    A group like "35" = 2 beamed notes (eighths).
-    A group like "6." = dotted quarter.
-    A group like "6" = quarter note.
-    A group like "0" = rest.
-    A group like "-" = extend.
-    """
-    # Strip non-musical chars
-    group = group.strip()
-    if not group:
-        return
-
-    # Pure extend dashes
-    if re.fullmatch(r"-+", group):
-        for _ in group:
-            tokens.append(JianpuToken(kind="extend"))
-        return
-
+def _parse_group_flat(group: str, tokens: list) -> None:
+    """Parse a flat group (no parentheses) into tokens using underlines."""
     # Check for dotted note: single digit followed by dot, e.g. "6."
     dot_match = re.fullmatch(r"([0-7])\.+", group)
     if dot_match:
@@ -279,6 +262,79 @@ def _parse_group(group: str, tokens: list) -> None:
         elif 1 <= d <= 7:
             tokens.append(JianpuToken(kind="note", degree=d, underlines=underlines))
         # Skip 8, 9 (OCR noise)
+
+
+def _parse_group(group: str, tokens: list) -> None:
+    """Parse a space-separated group into tokens.
+
+    Supports mixed subdivisions via parenthesized sub-groups, e.g. "1(23)".
+    Falls back to flat parsing when no parentheses are present.
+    """
+    # Strip non-musical chars
+    group = group.strip()
+    if not group:
+        return
+
+    # Pure extend dashes
+    if re.fullmatch(r"-+", group):
+        for _ in group:
+            tokens.append(JianpuToken(kind="extend"))
+        return
+
+    # No parentheses → use flat logic (backward compatible)
+    if "(" not in group:
+        _parse_group_flat(group, tokens)
+        return
+
+    # Mixed subdivision: tokenize into top-level elements
+    elements: list = []  # list of {"kind": "bare"/"subgroup", "digits": [...]}
+    i = 0
+    while i < len(group):
+        ch = group[i]
+        if ch == "(":
+            # Collect digits inside parentheses
+            i += 1  # skip '('
+            sub_digits: list = []
+            while i < len(group) and group[i] != ")":
+                if group[i] in "01234567":
+                    sub_digits.append(int(group[i]))
+                i += 1
+            if i < len(group):
+                i += 1  # skip ')'
+            if sub_digits:
+                elements.append({"kind": "subgroup", "digits": sub_digits})
+        elif ch in "01234567":
+            elements.append({"kind": "bare", "digits": [int(ch)]})
+            i += 1
+        elif ch == "-":
+            elements.append({"kind": "bare", "digits": [-1]})  # extend
+            i += 1
+        else:
+            i += 1
+
+    if not elements:
+        return
+
+    top_n = len(elements)
+    beats_per_element = 1.0 / top_n
+
+    for elem in elements:
+        if elem["kind"] == "bare":
+            d = elem["digits"][0]
+            if d == -1:
+                tokens.append(JianpuToken(kind="extend", duration_beats=beats_per_element))
+            elif d == 0:
+                tokens.append(JianpuToken(kind="rest", duration_beats=beats_per_element))
+            elif 1 <= d <= 7:
+                tokens.append(JianpuToken(kind="note", degree=d, duration_beats=beats_per_element))
+        else:
+            # subgroup: each note gets equal share of this element's allocation
+            sub_beats = beats_per_element / len(elem["digits"])
+            for d in elem["digits"]:
+                if d == 0:
+                    tokens.append(JianpuToken(kind="rest", duration_beats=sub_beats))
+                elif 1 <= d <= 7:
+                    tokens.append(JianpuToken(kind="note", degree=d, duration_beats=sub_beats))
 
 
 # ── Pitch conversion ─────────────────────────────────────────
@@ -356,16 +412,26 @@ def build_jianpu_measures(
             continue
 
         if token.kind == "note":
-            # Determine duration from underlines
-            if token.underlines == 0:
-                dur_name = "quarter"
-                dur_beats = 1.0
-            elif token.underlines == 1:
-                dur_name = "eighth"
-                dur_beats = 0.5
+            # Use explicit duration_beats if set (mixed subdivision),
+            # otherwise fall back to underlines-based duration
+            if token.duration_beats > 0:
+                dur_beats = token.duration_beats
+                if dur_beats <= 0.25:
+                    dur_name = "sixteenth"
+                elif dur_beats <= 0.5:
+                    dur_name = "eighth"
+                else:
+                    dur_name = "quarter"
             else:
-                dur_name = "sixteenth"
-                dur_beats = 0.25
+                if token.underlines == 0:
+                    dur_name = "quarter"
+                    dur_beats = 1.0
+                elif token.underlines == 1:
+                    dur_name = "eighth"
+                    dur_beats = 0.5
+                else:
+                    dur_name = "sixteenth"
+                    dur_beats = 0.25
 
             if token.dotted:
                 dur_beats *= 1.5
@@ -382,8 +448,10 @@ def build_jianpu_measures(
             current_beat += dur_beats
 
         elif token.kind == "rest":
-            # Rest duration matches the context underlines
-            if token.underlines == 0:
+            # Use explicit duration_beats if set, otherwise underlines
+            if token.duration_beats > 0:
+                current_beat += token.duration_beats
+            elif token.underlines == 0:
                 current_beat += 1.0
             elif token.underlines == 1:
                 current_beat += 0.5
@@ -391,8 +459,8 @@ def build_jianpu_measures(
                 current_beat += 0.25
 
         elif token.kind == "extend":
-            # Extend previous note by one beat (dash = held note)
-            current_beat += 1.0
+            # Use explicit duration_beats if set, otherwise 1 beat
+            current_beat += token.duration_beats if token.duration_beats > 0 else 1.0
 
     # Flush remaining notes as final measure
     _flush()

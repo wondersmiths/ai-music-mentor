@@ -120,6 +120,81 @@ describe("parseJianpu", () => {
     expect(notes).toHaveLength(3);
     expect(notes[0].beats).toBeCloseTo(1 / 3, 5);
   });
+
+  // ── Mixed subdivisions (parenthesized sub-groups) ──────────
+
+  it("parses 1(23) as eighth + two sixteenths", () => {
+    const { notes } = parseJianpu("1(23)", 4);
+    expect(notes).toHaveLength(3);
+    expect(notes[0].beats).toBeCloseTo(0.5, 5);   // bare "1" = 1/2
+    expect(notes[1].beats).toBeCloseTo(0.25, 5);   // sub "2" = (1/2)/2
+    expect(notes[2].beats).toBeCloseTo(0.25, 5);   // sub "3" = (1/2)/2
+  });
+
+  it("parses (12)3 as two sixteenths + eighth", () => {
+    const { notes } = parseJianpu("(12)3", 4);
+    expect(notes).toHaveLength(3);
+    expect(notes[0].beats).toBeCloseTo(0.25, 5);
+    expect(notes[1].beats).toBeCloseTo(0.25, 5);
+    expect(notes[2].beats).toBeCloseTo(0.5, 5);
+  });
+
+  it("parses 1(234) as eighth + three sub-notes", () => {
+    const { notes } = parseJianpu("1(234)", 4);
+    expect(notes).toHaveLength(4);
+    expect(notes[0].beats).toBeCloseTo(0.5, 5);
+    const subBeat = 0.5 / 3;
+    expect(notes[1].beats).toBeCloseTo(subBeat, 5);
+    expect(notes[2].beats).toBeCloseTo(subBeat, 5);
+    expect(notes[3].beats).toBeCloseTo(subBeat, 5);
+  });
+
+  it("parses (12)(34) as four sixteenths", () => {
+    const { notes } = parseJianpu("(12)(34)", 4);
+    expect(notes).toHaveLength(4);
+    for (const n of notes) {
+      expect(n.beats).toBeCloseTo(0.25, 5);
+    }
+  });
+
+  it("1(23) total beats sum to 1.0", () => {
+    const { notes } = parseJianpu("1(23)", 4);
+    const total = notes.reduce((sum, n) => sum + n.beats, 0);
+    expect(total).toBeCloseTo(1.0, 5);
+  });
+
+  it("backward compat: 12 still gives two eighths", () => {
+    const { notes } = parseJianpu("12", 4);
+    expect(notes).toHaveLength(2);
+    expect(notes[0].beats).toBe(0.5);
+    expect(notes[1].beats).toBe(0.5);
+  });
+
+  it("mixed group in context: 1 1(23) 4", () => {
+    const { notes } = parseJianpu("1 1(23) 4", 4);
+    expect(notes).toHaveLength(5);
+    // First quarter note
+    expect(notes[0].beats).toBe(1);
+    expect(notes[0].degree).toBe(1);
+    // Mixed group
+    expect(notes[1].beats).toBeCloseTo(0.5, 5);
+    expect(notes[2].beats).toBeCloseTo(0.25, 5);
+    expect(notes[3].beats).toBeCloseTo(0.25, 5);
+    // Last quarter note
+    expect(notes[4].beats).toBe(1);
+    expect(notes[4].degree).toBe(4);
+  });
+
+  it("rests inside sub-groups: 1(03)", () => {
+    const { notes } = parseJianpu("1(03)", 4);
+    expect(notes).toHaveLength(3);
+    expect(notes[0].degree).toBe(1);
+    expect(notes[0].beats).toBeCloseTo(0.5, 5);
+    expect(notes[1].degree).toBe(0); // rest
+    expect(notes[1].beats).toBeCloseTo(0.25, 5);
+    expect(notes[2].degree).toBe(3);
+    expect(notes[2].beats).toBeCloseTo(0.25, 5);
+  });
 });
 
 // ── Curve generation ────────────────────────────────────────
