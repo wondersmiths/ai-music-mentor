@@ -379,6 +379,36 @@ export default function PracticePage() {
   if (phase === "countdown") {
     return (
       <div style={styles.app}>
+        <header style={styles.header}>
+          <h1 style={styles.h1}>
+            {exerciseType === "long_tone"
+              ? `Long Tone — ${targetNote}`
+              : exerciseType === "scale"
+                ? `Scale — ${scalePreset}`
+                : `Melody — ${melodyPreset}`}
+          </h1>
+        </header>
+
+        {/* Show the music sheet so students can preview */}
+        {exerciseType !== "long_tone" && jianpuCurve.notes.length > 0 && (
+          <JianpuStrip
+            notes={jianpuCurve.notes}
+            currentBar={1}
+            currentBeat={0}
+            beatsPerMeasure={4}
+          />
+        )}
+
+        {exerciseType === "long_tone" && (
+          <div style={styles.pitchDisplay}>
+            <div style={styles.pitchNote}>{targetNote}</div>
+            <div style={styles.pitchFreq}>
+              {Math.round(NOTE_FREQUENCIES[targetNote])} Hz
+            </div>
+          </div>
+        )}
+
+        {/* Countdown overlay */}
         <div style={styles.countdownContainer}>
           <div style={styles.countdownNumber}>{countdownValue}</div>
           <div style={styles.countdownLabel}>Get ready...</div>
@@ -1201,7 +1231,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column" as const,
     alignItems: "center",
     justifyContent: "center",
-    padding: "80px 0",
+    padding: "32px 0",
   },
   countdownNumber: {
     fontSize: 96,
