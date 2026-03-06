@@ -61,12 +61,39 @@ async def evaluate_practice(req: EvaluateRequest):
         if req.reference_curve:
             reference_curve = [(p.time, p.frequency) for p in req.reference_curve]
 
+        # Debug: log what we're sending to the evaluator
+        freqs = [f for _, f, _ in played_frames if f > 0]
+        logger.info(
+            "Evaluate request: exercise=%s, frames=%d, voiced=%d, "
+            "freq_range=%.1f–%.1f Hz, duration=%.2f, "
+            "target_freq=%s, ref_curve_len=%s, bpm=%s",
+            req.exercise_type,
+            len(played_frames),
+            len(freqs),
+            min(freqs) if freqs else 0,
+            max(freqs) if freqs else 0,
+            req.duration,
+            req.target_frequency,
+            len(reference_curve) if reference_curve else None,
+            req.bpm,
+        )
+
         result = evaluate(
             played_frames=played_frames,
             exercise_type=req.exercise_type,
             target_frequency=req.target_frequency,
             reference_curve=reference_curve,
             bpm=req.bpm,
+        )
+
+        logger.info(
+            "Evaluate result: overall=%.1f, pitch=%.1f, stability=%.1f, "
+            "slide=%.1f, rhythm=%.1f",
+            result.overall_score,
+            result.pitch_score,
+            result.stability_score,
+            result.slide_score,
+            result.rhythm_score,
         )
 
         # Build response

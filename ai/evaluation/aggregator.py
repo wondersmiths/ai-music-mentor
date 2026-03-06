@@ -8,9 +8,12 @@ recommended training type, and textual feedback.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 
 from ai.evaluation.dtw import DTWResult, dtw_align
+
+logger = logging.getLogger(__name__)
 from ai.evaluation.onset_from_pitch import detect_onsets_from_pitch
 from ai.evaluation.rhythm import RhythmResult, analyze_rhythm
 from ai.evaluation.slide import SlideResult, analyze_slides
@@ -41,6 +44,51 @@ WEIGHTS = {
     "melody":    {"pitch": 0.35, "stability": 0.15, "slide": 0.15, "rhythm": 0.35},
 }
 DEFAULT_WEIGHTS = {"pitch": 0.35, "stability": 0.25, "slide": 0.1, "rhythm": 0.3}
+
+
+# ── Stability from DTW alignment (for scale/melody) ────────
+
+def _stability_from_dtw(
+    played: list[tuple[float, float]],
+    reference: list[tuple[float, float]],
+    dtw_result: DTWResult,
+) -> float:
+    """
+    Compute per-note stability using DTW alignment.
+
+    For each played frame, compare it against the matched reference frequency.
+    This avoids the single-target problem where scale/melody stability is
+    always 0 because the student is supposed to play different pitches.
+    """
+    import numpy as np
+
+    played_clean = [(t, f) for t, f in played if f > 0]
+    ref_clean = [(t, f) for t, f in reference if f > 0]
+
+    if not played_clean or not ref_clean or not dtw_result.alignment_path:
+        return 100.0
+
+    played_freqs = np.array([f for _, f in played_clean])
+    ref_freqs = np.array([f for _, f in ref_clean])
+
+    # Compute cents deviation for each aligned pair
+    cents_devs = []
+    for pi, ri in dtw_result.alignment_path:
+        pf = played_freqs[pi]
+        rf = ref_freqs[ri]
+        if pf > 0 and rf > 0:
+            cents_devs.append(abs(1200.0 * np.log2(pf / rf)))
+
+    if not cents_devs:
+        return 100.0
+
+    # Stability = how consistently the player matches the reference.
+    # Mean deviation within 20 cents (vibrato band) → 100.
+    # Excess beyond vibrato band penalizes, 80+ cents excess → 0.
+    abs_cents = np.array(cents_devs)
+    excess = np.maximum(abs_cents - 20.0, 0.0)
+    mean_excess = float(np.mean(excess))
+    return max(0.0, round(100.0 * (1.0 - mean_excess / 80.0), 2))
 
 
 # ── Pitch score from DTW cents error ────────────────────────
@@ -162,13 +210,26 @@ def evaluate(
         dtw_result = dtw_align(played_tf, reference_curve)
         pitch_score = _pitch_score_from_error(dtw_result.pitch_error_mean)
         rhythm_score = _rhythm_score_from_deviation(dtw_result.timing_deviation)
+        logger.info(
+            "DTW: pitch_error_mean=%.1f cents, timing_dev=%.3fs → "
+            "pitch_score=%.1f, rhythm_score=%.1f, path_len=%d",
+            dtw_result.pitch_error_mean, dtw_result.timing_deviation,
+            pitch_score, rhythm_score, len(dtw_result.alignment_path),
+        )
     elif target_frequency and target_frequency > 0:
         # For long_tone: measure pitch accuracy as mean deviation from target
         valid_freqs = [f for _, f, _ in played_frames if f > 0]
         if valid_freqs:
             import numpy as np
             cents = [abs(1200.0 * np.log2(f / target_frequency)) for f in valid_freqs]
-            pitch_score = _pitch_score_from_error(float(np.mean(cents)))
+            mean_cents = float(np.mean(cents))
+            pitch_score = _pitch_score_from_error(mean_cents)
+            logger.info(
+                "Long tone pitch: target=%.1f Hz, played_mean=%.1f Hz, "
+                "mean_cents_error=%.1f → pitch_score=%.1f",
+                target_frequency, float(np.mean(valid_freqs)),
+                mean_cents, pitch_score,
+            )
 
     # ── Stability analysis ───────────────────────────────────
     stability_result: StabilityResult | None = None
@@ -177,14 +238,19 @@ def evaluate(
     if target_frequency and target_frequency > 0:
         stability_result = analyze_stability(played_frames, target_frequency)
         stab_score = stability_result.stability_score
-    elif reference_curve:
-        # Use median frequency of reference as rough target
-        ref_freqs = [f for _, f in reference_curve if f > 0]
-        if ref_freqs:
-            import numpy as np
-            median_freq = float(np.median(ref_freqs))
-            stability_result = analyze_stability(played_frames, median_freq)
-            stab_score = stability_result.stability_score
+        logger.info(
+            "Stability (target=%.1f Hz): mean_dev=%.1f cents, "
+            "variance=%.1f → score=%.1f",
+            target_frequency, stability_result.mean_deviation_cents,
+            stability_result.variance_cents, stab_score,
+        )
+    elif reference_curve and dtw_result and dtw_result.alignment_path:
+        # For scale/melody: measure stability per-note using DTW alignment.
+        # For each played frame, the "target" is the matched reference freq.
+        stab_score = _stability_from_dtw(played_tf, reference_curve, dtw_result)
+        logger.info(
+            "Stability (per-note via DTW): score=%.1f", stab_score,
+        )
 
     # ── Slide score ──────────────────────────────────────────
     slide_result = analyze_slides(played_frames)
