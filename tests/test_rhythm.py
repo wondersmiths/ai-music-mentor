@@ -56,7 +56,7 @@ class TestSmallDeviations:
         onsets = [i * sec_per_beat + jitter[i] for i in range(8)]
 
         result = analyze_rhythm(onsets, bpm=120, beats_per_measure=4, num_measures=2)
-        assert result.rhythm_score < 85
+        assert result.rhythm_score < 92
 
 
 # ── Missing onsets ──────────────────────────────────────────

@@ -15,7 +15,7 @@ import type { EvaluateResult } from "@/lib/api";
 
 // ── Constants ────────────────────────────────────────────────
 
-type Phase = "selecting" | "starting" | "recording" | "evaluating" | "results";
+type Phase = "selecting" | "starting" | "countdown" | "recording" | "evaluating" | "results";
 type ExerciseType = "long_tone" | "scale" | "melody";
 
 const NOTE_FREQUENCIES: Record<string, number> = {
@@ -117,6 +117,9 @@ export default function PracticePage() {
   const [scalePreset, setScalePreset] = useState("D Major");
   const [melodyPreset, setMelodyPreset] = useState("Twinkle");
   const [customJianpu, setCustomJianpu] = useState("");
+
+  // Countdown state
+  const [countdownValue, setCountdownValue] = useState(0);
 
   // Error state
   const [error, setError] = useState("");
@@ -239,6 +242,11 @@ export default function PracticePage() {
   }, [exerciseType]);
 
   const handleStopRecording = useCallback(async () => {
+    // Cancel countdown if still running
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
     if (phaseRef.current !== "recording") return;
     setPhase("evaluating");
     pitchDetector.stop();
@@ -288,6 +296,8 @@ export default function PracticePage() {
     }
   }, [recorder.state, phase, handleStopRecording]);
 
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const handleStartRecording = useCallback(async () => {
     setError("");
     setResult(null);
@@ -308,14 +318,33 @@ export default function PracticePage() {
       return;
     }
 
-    recorder.reset();
-    stabilityAnalyzer.reset();
-    recorder.start();
-    if (exerciseType !== "long_tone") {
-      cursor.start();
-    }
-    setPhase("recording");
-  }, [pitchDetector, recorder, stabilityAnalyzer, cursor, exerciseType]);
+    // Start countdown (4 beats at the selected BPM)
+    const beatInterval = 60000 / bpm; // ms per beat
+    const totalBeats = 4;
+    let remaining = totalBeats;
+    setCountdownValue(remaining);
+    setPhase("countdown");
+
+    countdownRef.current = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        // Countdown finished — start recording
+        if (countdownRef.current) clearInterval(countdownRef.current);
+        countdownRef.current = null;
+        setCountdownValue(0);
+
+        recorder.reset();
+        stabilityAnalyzer.reset();
+        recorder.start();
+        if (exerciseType !== "long_tone") {
+          cursor.start();
+        }
+        setPhase("recording");
+      } else {
+        setCountdownValue(remaining);
+      }
+    }, beatInterval);
+  }, [pitchDetector, recorder, stabilityAnalyzer, cursor, exerciseType, bpm]);
 
   const handleTryAgain = useCallback(() => {
     setResult(null);
@@ -345,6 +374,28 @@ export default function PracticePage() {
     score >= 80 ? "#22c55e" : score >= 60 ? "#eab308" : "#ef4444";
 
   // ── Phase: Selecting ───────────────────────────────────────
+
+  if (phase === "countdown") {
+    return (
+      <div style={styles.app}>
+        <div style={styles.countdownContainer}>
+          <div style={styles.countdownNumber}>{countdownValue}</div>
+          <div style={styles.countdownLabel}>Get ready...</div>
+          <button
+            style={{ ...styles.stopBtnFull, maxWidth: 200, marginTop: 24 }}
+            onClick={() => {
+              if (countdownRef.current) clearInterval(countdownRef.current);
+              countdownRef.current = null;
+              pitchDetector.stop();
+              setPhase("selecting");
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (phase === "selecting" || phase === "starting") {
     return (
@@ -1133,6 +1184,28 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 16,
     fontWeight: 600,
     cursor: "pointer",
+  },
+
+  // ── Countdown phase ──
+  countdownContainer: {
+    display: "flex",
+    flexDirection: "column" as const,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "80px 0",
+  },
+  countdownNumber: {
+    fontSize: 96,
+    fontWeight: 700,
+    color: "#3b82f6",
+    lineHeight: 1,
+    marginBottom: 8,
+    animation: "pulse 0.5s ease-in-out infinite",
+  },
+  countdownLabel: {
+    fontSize: 18,
+    color: "#64748b",
+    fontWeight: 500,
   },
 
   // ── Evaluating phase ──

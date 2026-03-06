@@ -30,7 +30,8 @@ def detect_onsets_from_pitch(
     cooldown_s: float = COOLDOWN_S,
 ) -> List[float]:
     """
-    Detect note onsets from pitch frames by finding frequency jumps.
+    Detect note onsets from pitch frames by finding frequency jumps
+    and silence-to-sound transitions (for repeated same-pitch notes).
 
     Args:
         frames: list of (time, frequency, confidence) tuples.
@@ -40,24 +41,34 @@ def detect_onsets_from_pitch(
     Returns:
         Sorted list of onset timestamps in seconds.
     """
-    # Filter to voiced frames (positive frequency)
-    voiced = [(t, f) for t, f, c in frames if f > 0 and c > 0]
+    if not frames:
+        return []
 
-    if len(voiced) < 2:
-        return [voiced[0][0]] if voiced else []
+    onsets: List[float] = []
+    last_onset_time = -1.0
+    prev_voiced = False
+    prev_freq = 0.0
 
-    onsets: List[float] = [voiced[0][0]]  # First voiced frame is always an onset
+    for t, f, c in frames:
+        is_voiced = f > 0 and c > 0
 
-    last_onset_time = voiced[0][0]
+        if is_voiced:
+            if not prev_voiced:
+                # Silence-to-sound transition (covers repeated notes
+                # separated by brief gaps and the very first note)
+                if (t - last_onset_time) >= cooldown_s:
+                    onsets.append(t)
+                    last_onset_time = t
+            elif prev_freq > 0:
+                # Frequency jump within voiced region
+                cents = _cents_between(prev_freq, f)
+                if cents >= threshold_cents and (t - last_onset_time) >= cooldown_s:
+                    onsets.append(t)
+                    last_onset_time = t
+            prev_freq = f
+        else:
+            prev_freq = 0.0
 
-    for i in range(1, len(voiced)):
-        t, f = voiced[i]
-        _, prev_f = voiced[i - 1]
-
-        cents = _cents_between(prev_f, f)
-
-        if cents >= threshold_cents and (t - last_onset_time) >= cooldown_s:
-            onsets.append(t)
-            last_onset_time = t
+        prev_voiced = is_voiced
 
     return onsets

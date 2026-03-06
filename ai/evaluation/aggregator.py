@@ -48,9 +48,10 @@ DEFAULT_WEIGHTS = {"pitch": 0.35, "stability": 0.25, "slide": 0.1, "rhythm": 0.3
 def _pitch_score_from_error(mean_cents_error: float) -> float:
     """
     Convert mean pitch error in cents to a 0–100 score.
-    0 cents → 100, 100+ cents → 0. Linear ramp.
+    0 cents → 100, 200+ cents → 0. Linear ramp.
+    Generous threshold accounts for natural vibrato and pitch detection noise.
     """
-    return max(0.0, 100.0 * (1.0 - mean_cents_error / 100.0))
+    return max(0.0, 100.0 * (1.0 - mean_cents_error / 200.0))
 
 
 # ── Rhythm score from timing deviation ──────────────────────
@@ -58,9 +59,9 @@ def _pitch_score_from_error(mean_cents_error: float) -> float:
 def _rhythm_score_from_deviation(timing_dev: float) -> float:
     """
     Convert mean timing deviation in seconds to 0–100 score.
-    0s → 100, 0.5s+ → 0. Linear ramp.
+    0s → 100, 1.0s+ → 0. Linear ramp.
     """
-    return max(0.0, 100.0 * (1.0 - timing_dev / 0.5))
+    return max(0.0, 100.0 * (1.0 - timing_dev / 1.0))
 
 
 # ── Training recommendation ────────────────────────────────

@@ -148,9 +148,9 @@ def analyze_rhythm(
     # Coverage: fraction of grid points that got matched
     coverage = len(matched) / len(grid) if len(grid) > 0 else 0.0
 
-    # Score: 100 when mean_dev=0, drops toward 0 at 200ms+ mean deviation
+    # Score: 100 when mean_dev=0, drops toward 0 at 300ms+ mean deviation
     # Also penalize low coverage
-    accuracy_score = max(0.0, 100.0 * (1.0 - mean_dev_ms / 200.0))
+    accuracy_score = max(0.0, 100.0 * (1.0 - mean_dev_ms / 300.0))
     coverage_score = coverage * 100.0
     rhythm_score = 0.6 * accuracy_score + 0.4 * coverage_score
 

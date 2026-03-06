@@ -49,8 +49,8 @@ class TestLongTone:
             target_frequency=440.0,
         )
 
-        assert result.pitch_score < 60
-        assert result.overall_score < 80
+        assert result.pitch_score < 80
+        assert result.overall_score < 85
 
 
 # ── Scale / melody with reference curve ──────────────────────
@@ -82,7 +82,7 @@ class TestWithReference:
             target_frequency=440.0,
         )
 
-        assert result.pitch_score < 30
+        assert result.pitch_score < 65
         assert result.dtw_result is not None
         assert result.dtw_result.pitch_error_mean > 70
 
