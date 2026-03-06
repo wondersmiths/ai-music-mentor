@@ -113,6 +113,7 @@ export default function PracticePage() {
   const [instrument, setInstrument] = useState("erhu");
   const [instruments, setInstruments] = useState(FALLBACK_INSTRUMENTS);
   const [bpm, setBpm] = useState(120);
+  const [bpmInput, setBpmInput] = useState("120");
   const [targetNote, setTargetNote] = useState("D5");
   const [scalePreset, setScalePreset] = useState("D Major");
   const [melodyPreset, setMelodyPreset] = useState("Twinkle");
@@ -456,8 +457,16 @@ export default function PracticePage() {
               min={40}
               max={240}
               step={1}
-              value={bpm}
-              onChange={(e) => setBpm(Math.max(40, Math.min(240, Number(e.target.value) || 40)))}
+              value={bpmInput}
+              onChange={(e) => setBpmInput(e.target.value)}
+              onBlur={() => {
+                const n = Math.max(40, Math.min(240, Math.round(Number(bpmInput) || 120)));
+                setBpm(n);
+                setBpmInput(String(n));
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              }}
               style={styles.bpmInput}
               disabled={phase === "starting"}
             />
